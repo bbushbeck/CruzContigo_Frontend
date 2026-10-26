@@ -7,22 +7,40 @@ private enum MedicalStyle {
 
 struct MedicationsView: View {
     @StateObject private var model: MedicationViewModel
-    @State private var recipient: CareRecipient
+    @State private var selectedRecipientID: UUID?
     @State private var status: MedicationStatus = .active
     @State private var showingAdd = false
     @Environment(\.dismiss) private var dismiss
 
     private let recipients: [CareRecipient]
 
-    init(recipients: [CareRecipient] = CareRecipient.examples,
+    private var recipient: CareRecipient? {
+        recipients.first { $0.id == selectedRecipientID } ?? recipients.first
+    }
+
+    init(recipients: [CareRecipient],
          selectedRecipient: CareRecipient? = nil,
-         service: any MedicationService = DemoMedicationService()) {
+         service: any MedicationService = MedicationServices.live()) {
         self.recipients = recipients
-        _recipient = State(initialValue: selectedRecipient ?? recipients.first ?? CareRecipient.maria)
+        _selectedRecipientID = State(initialValue: selectedRecipient?.id ?? recipients.first?.id)
         _model = StateObject(wrappedValue: MedicationViewModel(service: service))
     }
 
     var body: some View {
+        Group {
+            if let recipient {
+                content(for: recipient)
+            } else {
+                VStack {
+                    BrandBackButton { dismiss() }
+                    ContentUnavailableView("Sin familiares", systemImage: "person.crop.circle.badge.plus",
+                        description: Text("Registra un familiar para agregar sus medicamentos."))
+                }
+            }
+        }
+    }
+
+    private func content(for recipient: CareRecipient) -> some View {
         VStack(spacing: 0) {
             HStack {
                 BrandBackButton { dismiss() }
@@ -37,6 +55,7 @@ struct MedicationsView: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Agregar medicamento")
+                .disabled(model.isLoading)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
@@ -45,7 +64,7 @@ struct MedicationsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Menu {
                         ForEach(recipients) { person in
-                            Button(person.name) { recipient = person }
+                            Button(person.name) { selectedRecipientID = person.id }
                         }
                     } label: {
                         HStack(spacing: 12) {
@@ -89,8 +108,8 @@ struct MedicationsView: View {
                                             .background(MedicalStyle.pale, in: RoundedRectangle(cornerRadius: 12))
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(medication.name).font(.app(.headline)).foregroundStyle(.primary)
-                                            Text(medication.dose).foregroundStyle(Color.textoSuave)
-                                            Text(medication.status == .active ? medication.frequency : "Tratamiento anterior")
+                                            Text(medication.doseLabel).foregroundStyle(Color.textoSuave)
+                                            Text(medication.status == .active ? (medication.frequency ?? "Frecuencia no indicada") : "Tratamiento anterior")
                                                 .font(.app(.caption)).foregroundStyle(Color.textoSuave)
                                         }
                                         Spacer()
@@ -103,8 +122,10 @@ struct MedicationsView: View {
                             }
                         }
                     }
-                    Label("Los cambios se guardan solo durante esta sesión de demostración.", systemImage: "info.circle")
-                        .font(.app(.footnote)).foregroundStyle(Color.textoSuave)
+                    Button("Actualizar medicamentos") {
+                        Task { await model.load(for: recipient.id) }
+                    }
+                    .disabled(model.isLoading)
                 }
                 .padding()
             }
@@ -115,7 +136,7 @@ struct MedicationsView: View {
                 MedicationFormView(recipient: recipient, model: model)
             }
         }
-        .task { await model.load() }
+        .task(id: recipient.id) { await model.load(for: recipient.id) }
         .alert("Error", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -131,6 +152,8 @@ struct MedicationDetailView: View {
     @ObservedObject var model: MedicationViewModel
     @State private var showingEdit = false
     @State private var showingDelete = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
     @Environment(\.dismiss) private var dismiss
 
     private var medication: Medication? { model.medications.first { $0.id == medicationID } }
@@ -146,20 +169,22 @@ struct MedicationDetailView: View {
                         LabeledContent("Estado", value: medication.status.rawValue)
                     }
                     Section("Tratamiento") {
-                        LabeledContent("Dosis", value: medication.dose)
-                        LabeledContent("Frecuencia", value: medication.frequency)
-                        LabeledContent("Vía", value: medication.route)
-                        LabeledContent("Inicio", value: medication.startDate.formatted(date: .abbreviated, time: .omitted))
+                        LabeledContent("Presentación", value: medication.presentation ?? "No especificada")
+                        LabeledContent("Dosis", value: medication.doseLabel)
+                        LabeledContent("Frecuencia", value: medication.frequency ?? "No indicada")
+                        LabeledContent("Inicio", value: MedicationDay.label(medication.startDate))
                         if let end = medication.endDate {
-                            LabeledContent("Fin", value: end.formatted(date: .abbreviated, time: .omitted))
+                            LabeledContent("Fin", value: MedicationDay.label(end))
                         }
                     }
                     Section("Información adicional") {
-                        LabeledContent("Indicación", value: medication.indication.isEmpty ? "No especificada" : medication.indication)
-                        LabeledContent("Médico", value: medication.prescribingDoctor.isEmpty ? "No especificado" : medication.prescribingDoctor)
+                        LabeledContent("Indicación", value: medication.indication ?? "No especificada")
+                        LabeledContent("Existencias", value: medication.stock ?? "No registradas")
+                        LabeledContent("Umbral de resurtido", value: "\(medication.refillThresholdDays) días")
                     }
                     Section {
                         Button("Eliminar medicamento", role: .destructive) { showingDelete = true }
+                            .disabled(isDeleting)
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -168,6 +193,7 @@ struct MedicationDetailView: View {
                 .toolbar(.visible, for: .navigationBar)
                 .toolbar {
                     Button("Editar") { showingEdit = true }
+                        .disabled(isDeleting)
                 }
                 .sheet(isPresented: $showingEdit) {
                     NavigationStack {
@@ -176,9 +202,25 @@ struct MedicationDetailView: View {
                 }
                 .confirmationDialog("¿Eliminar este medicamento?", isPresented: $showingDelete) {
                     Button("Eliminar", role: .destructive) {
-                        Task { if await model.delete(medication) { dismiss() } }
+                        isDeleting = true
+                        Task {
+                            let success = await model.delete(medication)
+                            isDeleting = false
+                            if success {
+                                dismiss()
+                            } else {
+                                deleteError = model.errorMessage
+                                model.errorMessage = nil
+                            }
+                        }
                     }
                 } message: { Text("Esta acción elimina el registro de la lista.") }
+                .alert("No se pudo eliminar", isPresented: Binding(
+                    get: { deleteError != nil },
+                    set: { if !$0 { deleteError = nil } }
+                )) {
+                    Button("Aceptar", role: .cancel) { deleteError = nil }
+                } message: { Text(deleteError ?? "") }
             } else {
                 ContentUnavailableView("Medicamento no disponible", systemImage: "pills")
             }
@@ -193,48 +235,71 @@ struct MedicationFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    @State private var presentation = ""
     @State private var dose = ""
-    @State private var frequency = "Cada 24 horas"
-    @State private var route = "Oral"
-    @State private var startDate = Date()
+    @State private var unit = ""
+    @State private var frequency = ""
+    @State private var startDate = Calendar.current.startOfDay(for: Date())
     @State private var hasEndDate = false
-    @State private var endDate = Date()
+    @State private var endDate = Calendar.current.startOfDay(for: Date())
     @State private var indication = ""
-    @State private var doctor = ""
-    @State private var status: MedicationStatus = .active
+    @State private var stock = ""
+    @State private var refillThresholdDays = 5
     @State private var isSaving = false
+    @State private var saveError: String?
+
+    private func optionalText(_ value: String) -> String? {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private func decimalText(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+    }
+
+    private func validDecimal(_ value: String, positive: Bool) -> Bool {
+        let normalized = decimalText(value)
+        guard normalized.range(of: #"^[0-9]{1,8}(\.[0-9]{1,2})?$"#, options: .regularExpression) != nil,
+              let number = Decimal(string: normalized, locale: Locale(identifier: "en_US_POSIX")) else { return false }
+        return positive ? number > 0 : number >= 0
+    }
 
     private var valid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !dose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        (!hasEndDate || endDate >= Calendar.current.startOfDay(for: startDate))
+        optionalText(name) != nil && name.count <= 120 &&
+        validDecimal(dose, positive: true) && presentation.count <= 60 &&
+        unit.count <= 10 && frequency.count <= 60 && indication.utf8.count <= 65535 &&
+        (optionalText(stock) == nil || validDecimal(stock, positive: false)) &&
+        (!hasEndDate || MedicationDay.string(from: endDate) >= MedicationDay.string(from: startDate))
     }
 
     var body: some View {
         Form {
             Section("Medicamento") {
                 TextField("Nombre del medicamento", text: $name)
-                TextField("Dosis (ej. 500 mg)", text: $dose)
-                Picker("Frecuencia", selection: $frequency) {
-                    ForEach(["Cada 4 horas", "Cada 6 horas", "Cada 8 horas", "Cada 12 horas", "Cada 24 horas", "Según indicación médica"], id: \.self) { Text($0) }
-                }
-                Picker("Vía de administración", selection: $route) {
-                    ForEach(["Oral", "Tópica", "Inhalada", "Oftálmica", "Otra"], id: \.self) { Text($0) }
-                }
-                Picker("Estado", selection: $status) {
-                    ForEach(MedicationStatus.allCases) { Text($0.rawValue).tag($0) }
-                }
+                TextField("Presentación (opcional, ej. tableta)", text: $presentation)
+                TextField("Dosis numérica (ej. 500 o 0,5)", text: $dose)
+                    .keyboardType(.decimalPad)
+                TextField("Unidad (opcional, ej. mg o ml)", text: $unit)
+                TextField("Frecuencia (opcional)", text: $frequency)
+                Text("La dosis debe ser mayor que cero y tener como máximo dos decimales.")
+                    .font(.app(.footnote)).foregroundStyle(Color.textoSuave)
             }
             Section("Fechas") {
                 DatePicker("Fecha de inicio", selection: $startDate, displayedComponents: .date)
                 Toggle("Tiene fecha de fin", isOn: $hasEndDate)
                 if hasEndDate {
-                    DatePicker("Fecha de fin", selection: $endDate, in: startDate..., displayedComponents: .date)
+                    DatePicker("Fecha de fin", selection: $endDate,
+                               in: Calendar.current.startOfDay(for: startDate)..., displayedComponents: .date)
                 }
+                Text("Los tratamientos cuya fecha de fin ya pasó aparecen en Anteriores.")
+                    .font(.app(.footnote)).foregroundStyle(Color.textoSuave)
             }
-            Section("Opcional") {
-                TextField("Indicación", text: $indication)
-                TextField("Médico que lo recetó", text: $doctor)
+            Section("Información adicional") {
+                TextField("Indicación (opcional)", text: $indication, axis: .vertical)
+                TextField("Existencias (opcional)", text: $stock)
+                    .keyboardType(.decimalPad)
+                Stepper("Umbral de resurtido: \(refillThresholdDays) días",
+                        value: $refillThresholdDays, in: 0...32767)
             }
             Section {
                 Text("Registra únicamente indicaciones confirmadas por un profesional de salud. Esta app no calcula ni recomienda dosis.")
@@ -246,6 +311,7 @@ struct MedicationFormView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancelar") { dismiss() }
+                    .disabled(isSaving)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar") {
@@ -253,44 +319,58 @@ struct MedicationFormView: View {
                         id: editing?.id ?? UUID(),
                         recipientID: editing?.recipientID ?? recipient.id,
                         name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                        dose: dose.trimmingCharacters(in: .whitespacesAndNewlines),
-                        frequency: frequency,
-                        route: route,
-                        startDate: startDate,
-                        endDate: hasEndDate ? endDate : nil,
-                        indication: indication,
-                        prescribingDoctor: doctor,
-                        status: status
+                        presentation: optionalText(presentation),
+                        dose: decimalText(dose),
+                        unit: optionalText(unit),
+                        frequency: optionalText(frequency),
+                        startDate: MedicationDay.string(from: startDate),
+                        endDate: hasEndDate ? MedicationDay.string(from: endDate) : nil,
+                        indication: optionalText(indication),
+                        stock: optionalText(stock) == nil ? nil : decimalText(stock),
+                        refillThresholdDays: refillThresholdDays
                     )
                     isSaving = true
                     Task {
-                        let success = await model.save(medication)
+                        let success = await model.save(medication, updating: editing != nil)
                         isSaving = false
-                        if success { dismiss() }
+                        if success {
+                            dismiss()
+                        } else {
+                            saveError = model.errorMessage
+                            model.errorMessage = nil
+                        }
                     }
                 }
                 .disabled(!valid || isSaving)
             }
         }
+        .interactiveDismissDisabled(isSaving)
+        .alert("No se pudo guardar", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("Aceptar", role: .cancel) { saveError = nil }
+        } message: { Text(saveError ?? "") }
         .tint(MedicalStyle.red)
         .onAppear {
             guard let editing else { return }
             name = editing.name
+            presentation = editing.presentation ?? ""
             dose = editing.dose
-            frequency = editing.frequency
-            route = editing.route
-            startDate = editing.startDate
+            unit = editing.unit ?? ""
+            frequency = editing.frequency ?? ""
+            startDate = MedicationDay.date(from: editing.startDate) ?? startDate
             hasEndDate = editing.endDate != nil
-            endDate = editing.endDate ?? Date()
-            indication = editing.indication
-            doctor = editing.prescribingDoctor
-            status = editing.status
+            endDate = editing.endDate.flatMap { MedicationDay.date(from: $0) } ?? startDate
+            indication = editing.indication ?? ""
+            stock = editing.stock ?? ""
+            refillThresholdDays = editing.refillThresholdDays
         }
     }
 }
 
 #Preview {
     NavigationStack {
-        MedicationsView()
+        MedicationsView(recipients: CareRecipient.examples, service: DemoMedicationService())
     }
 }
