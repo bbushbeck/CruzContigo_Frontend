@@ -16,6 +16,11 @@
 			path = CruzContigo;
 			sourceTree = "<group>";
 		};
+		4C2BC59830886E6200654017 /* Funcionalidades */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Funcionalidades;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +37,7 @@
 			children = (
 				4C2BC58C3088623500654017 /* CruzContigo */,
 				4C2BC58B3088623500654017 /* Products */,
+				4C2BC59830886E6200654017 /* Funcionalidades */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,6 +64,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				4C2BC58C3088623500654017 /* CruzContigo */,
+				4C2BC59830886E6200654017 /* Funcionalidades */,
 			);
 			name = CruzContigo;
 			productName = CruzContigo;

@@ -8,7 +8,11 @@
 import SwiftUI
 
 struct VerifyPhoneView: View {
+    var onVerificado: () -> Void = {}
+
+    @Environment(\.dismiss) private var dismiss
     @State private var code: String = ""
+    @State private var codigoReenviado = false
 
     private let codeLength = 6
 
@@ -35,7 +39,7 @@ struct VerifyPhoneView: View {
 
     private var header: some View {
         HStack {
-            BrandBackButton(action: {})
+            BrandBackButton { dismiss() }
             Spacer()
         }
         .padding(.horizontal, 24)
@@ -44,15 +48,20 @@ struct VerifyPhoneView: View {
 
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 6) {
+            Text("PASO 1 DE 2")
+                .font(.app(.caption))
+                .fontWeight(.bold)
+                .foregroundColor(.brandRed)
+
             Text("Verifica tu número")
-                .font(.system(size: 30, weight: .bold))
+                .font(.app(.largeTitle).weight(.bold))
 
             (Text("Te enviamos un código de 6 dígitos al ")
-                .foregroundColor(.secondary)
+                .foregroundColor(.textoSuave)
             + Text("+52 81 •••• 4567")
                 .fontWeight(.bold)
                 .foregroundColor(.primary))
-                .font(.body)
+                .font(.app(.body))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 24)
@@ -61,8 +70,8 @@ struct VerifyPhoneView: View {
     private var codeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Ingresa el código para continuar.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.app(.subheadline))
+                .foregroundColor(.textoSuave)
 
             CodeInputView(code: $code, length: codeLength)
         }
@@ -73,11 +82,14 @@ struct VerifyPhoneView: View {
     private var resendSection: some View {
         VStack(spacing: 4) {
             Text("¿No recibiste el código?")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Button(action: {}) {
-                Text("Reenviar código")
-                    .font(.subheadline)
+                .font(.app(.subheadline))
+                .foregroundColor(.textoSuave)
+            Button {
+                code = ""
+                codigoReenviado = true
+            } label: {
+                Text(codigoReenviado ? "Código reenviado" : "Reenviar código")
+                    .font(.app(.subheadline))
                     .fontWeight(.bold)
                     .foregroundColor(.brandRed)
             }
@@ -86,22 +98,24 @@ struct VerifyPhoneView: View {
 
     private var footer: some View {
         VStack(spacing: 16) {
-            PrimaryButton(title: "Verificar y continuar", action: {})
+            PrimaryButton(title: "Verificar y continuar", action: onVerificado)
+                .disabled(code.count < codeLength)
+                .opacity(code.count < codeLength ? 0.5 : 1)
 
-            Button(action: {}) {
+            Button { dismiss() } label: {
                 Text("Cambiar número telefónico")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .fontWeight(.bold)
                     .foregroundColor(.brandRed)
             }
 
             HStack(spacing: 6) {
                 Image(systemName: "lock.fill")
-                    .font(.caption)
+                    .font(.app(.caption))
                 Text("Tu información se mantiene protegida.")
-                    .font(.footnote)
+                    .font(.app(.footnote))
             }
-            .foregroundColor(.secondary)
+            .foregroundColor(.textoSuave)
             .padding(.top, 8)
         }
         .padding(.horizontal, 24)
