@@ -17,7 +17,7 @@ enum AppConfig {
         #endif
     }
 
-    static let fichaMedicaEnAPI = false
+    static let fichaMedicaEnAPI = true
 }
 
 enum APIError: LocalizedError {
