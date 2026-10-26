@@ -51,7 +51,7 @@ struct LocalFichaMedicaRepository: FichaMedicaRepository {
 
 extension Repositorios {
     static func fichasMedicas() -> FichaMedicaRepository {
-        if let url = AppConfig.apiBaseURL {
+        if AppConfig.fichaMedicaEnAPI, let url = AppConfig.apiBaseURL {
             return RemoteFichaMedicaRepository(api: APIClient(baseURL: url))
         }
         return LocalFichaMedicaRepository()

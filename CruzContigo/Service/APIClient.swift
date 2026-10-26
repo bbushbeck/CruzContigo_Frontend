@@ -7,11 +7,17 @@ import Foundation
 
 enum AppConfig {
     static var apiBaseURL: URL? {
-        if let valor = ProcessInfo.processInfo.environment["CRUZ_API_URL"], let url = URL(string: valor) {
-            return url
+        if let valor = ProcessInfo.processInfo.environment["CRUZ_API_URL"] {
+            return valor.isEmpty ? nil : URL(string: valor)
         }
+        #if DEBUG
+        return URL(string: "http://localhost:3000")
+        #else
         return nil
+        #endif
     }
+
+    static let fichaMedicaEnAPI = false
 }
 
 enum APIError: LocalizedError {
