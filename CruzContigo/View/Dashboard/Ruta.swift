@@ -56,7 +56,7 @@ struct ModuloDestino: View {
             MedicationsView(
                 recipients: recipients,
                 selectedRecipient: recipients.first { $0.id == familiarID },
-                service: DemoMedicationService.compartido
+                service: MedicationServices.live()
             )
 
         case .citas, .recordatorios:

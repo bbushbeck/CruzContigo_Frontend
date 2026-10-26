@@ -8,26 +8,40 @@ final class MedicationViewModel: ObservableObject {
     @Published var isLoading = false
 
     private let service: any MedicationService
+    private var recipientID: UUID?
+    private var loadID: UUID?
 
-    init(service: any MedicationService = DemoMedicationService()) {
+    init(service: any MedicationService = MedicationServices.live()) {
         self.service = service
     }
 
-    func load() async {
+    func load(for recipientID: UUID) async {
+        let requestID = UUID()
+        loadID = requestID
+        if self.recipientID != recipientID { medications = [] }
+        self.recipientID = recipientID
+        errorMessage = nil
         isLoading = true
-        defer { isLoading = false }
+        defer { if loadID == requestID { isLoading = false } }
         do {
-            medications = try await service.fetchMedications()
+            let received = try await service.fetchMedications(for: recipientID)
+            guard loadID == requestID, !Task.isCancelled else { return }
+            medications = received
             errorMessage = nil
         } catch {
+            guard loadID == requestID, !Task.isCancelled else { return }
             errorMessage = "No se pudieron cargar los medicamentos: \(error.localizedDescription)"
         }
     }
 
-    func save(_ medication: Medication) async -> Bool {
+    func save(_ medication: Medication, updating: Bool = false) async -> Bool {
         do {
-            try await service.save(medication)
-            await load()
+            let saved = try await service.save(medication, updating: updating)
+            if recipientID == saved.recipientID {
+                medications.removeAll { $0.id == saved.id }
+                medications.append(saved)
+            }
+            errorMessage = nil
             return true
         } catch {
             errorMessage = "No se pudo guardar: \(error.localizedDescription)"
@@ -38,7 +52,8 @@ final class MedicationViewModel: ObservableObject {
     func delete(_ medication: Medication) async -> Bool {
         do {
             try await service.delete(medication)
-            await load()
+            medications.removeAll { $0.id == medication.id }
+            errorMessage = nil
             return true
         } catch {
             errorMessage = "No se pudo eliminar: \(error.localizedDescription)"
