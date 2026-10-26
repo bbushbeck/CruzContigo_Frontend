@@ -6,8 +6,19 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		4C2BC5A73088700000654017 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4C2BC5823088623500654017 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4C2BC5893088623500654017;
+			remoteInfo = CruzContigo;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		4C2BC58A3088623500654017 /* CruzContigo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CruzContigo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C2BC5A03088700000654017 /* CruzContigoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CruzContigoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -21,10 +32,20 @@
 			path = Funcionalidades;
 			sourceTree = "<group>";
 		};
+		4C2BC5A13088700000654017 /* CruzContigoTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CruzContigoTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		4C2BC5873088623500654017 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		4C2BC5A43088700000654017 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -38,6 +59,7 @@
 				4C2BC58C3088623500654017 /* CruzContigo */,
 				4C2BC58B3088623500654017 /* Products */,
 				4C2BC59830886E6200654017 /* Funcionalidades */,
+				4C2BC5A13088700000654017 /* CruzContigoTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -45,6 +67,7 @@
 			isa = PBXGroup;
 			children = (
 				4C2BC58A3088623500654017 /* CruzContigo.app */,
+				4C2BC5A03088700000654017 /* CruzContigoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -71,6 +94,27 @@
 			productReference = 4C2BC58A3088623500654017 /* CruzContigo.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4C2BC5A23088700000654017 /* CruzContigoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4C2BC5AA3088700000654017 /* Build configuration list for PBXNativeTarget "CruzContigoTests" */;
+			buildPhases = (
+				4C2BC5A33088700000654017 /* Sources */,
+				4C2BC5A43088700000654017 /* Frameworks */,
+				4C2BC5A53088700000654017 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4C2BC5A63088700000654017 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4C2BC5A13088700000654017 /* CruzContigoTests */,
+			);
+			name = CruzContigoTests;
+			productName = CruzContigoTests;
+			productReference = 4C2BC5A03088700000654017 /* CruzContigoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -83,6 +127,10 @@
 				TargetAttributes = {
 					4C2BC5893088623500654017 = {
 						CreatedOnToolsVersion = 26.6;
+					};
+					4C2BC5A23088700000654017 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 4C2BC5893088623500654017;
 					};
 				};
 			};
@@ -101,12 +149,18 @@
 			projectRoot = "";
 			targets = (
 				4C2BC5893088623500654017 /* CruzContigo */,
+				4C2BC5A23088700000654017 /* CruzContigoTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4C2BC5883088623500654017 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		4C2BC5A53088700000654017 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -119,7 +173,20 @@
 			files = (
 			);
 		};
+		4C2BC5A33088700000654017 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4C2BC5A63088700000654017 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4C2BC5893088623500654017 /* CruzContigo */;
+			targetProxy = 4C2BC5A73088700000654017 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4C2BC5933088623600654017 /* Debug configuration for PBXProject "CruzContigo" */ = {
@@ -303,6 +370,46 @@
 			};
 			name = Release;
 		};
+		4C2BC5AB3088700000654017 /* Debug configuration for PBXNativeTarget "CruzContigoTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bushbeck.CruzContigoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CruzContigo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CruzContigo";
+			};
+			name = Debug;
+		};
+		4C2BC5AC3088700000654017 /* Release configuration for PBXNativeTarget "CruzContigoTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bushbeck.CruzContigoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CruzContigo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CruzContigo";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -319,6 +426,14 @@
 			buildConfigurations = (
 				4C2BC5963088623600654017 /* Debug configuration for PBXNativeTarget "CruzContigo" */,
 				4C2BC5973088623600654017 /* Release configuration for PBXNativeTarget "CruzContigo" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		4C2BC5AA3088700000654017 /* Build configuration list for PBXNativeTarget "CruzContigoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4C2BC5AB3088700000654017 /* Debug configuration for PBXNativeTarget "CruzContigoTests" */,
+				4C2BC5AC3088700000654017 /* Release configuration for PBXNativeTarget "CruzContigoTests" */,
 			);
 			defaultConfigurationName = Release;
 		};
