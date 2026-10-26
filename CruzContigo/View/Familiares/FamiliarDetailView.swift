@@ -57,7 +57,7 @@ struct FamiliarDetailView: View {
                 }
             }
         } message: {
-            Text("Se borrará su perfil de este dispositivo.")
+            Text("Se borrará su perfil y no se podrá recuperar.")
         }
     }
 
@@ -89,7 +89,7 @@ struct FamiliarDetailView: View {
     private func datos(_ familiar: Familiar) -> some View {
         VStack(spacing: 0) {
             FilaDato(icono: "calendar", titulo: "Fecha de nacimiento",
-                     valor: "\(familiar.fechaNacimiento.formatted(date: .long, time: .omitted)) · \(familiar.edad) años")
+                     valor: "\(familiar.fechaNacimiento.formatted(.dateTime.day().month(.wide).year().locale(Locale(identifier: "es_MX")))) · \(familiar.edad) años")
             Divider().padding(.leading, 52)
             FilaDato(icono: "phone.fill", titulo: "Teléfono",
                      valor: familiar.telefono.map(formatearTelefono) ?? "Sin registrar")
