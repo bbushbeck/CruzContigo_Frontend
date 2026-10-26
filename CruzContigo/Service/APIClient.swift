@@ -23,6 +23,7 @@ enum AppConfig {
 enum APIError: LocalizedError {
     case respuestaInvalida
     case http(Int)
+    case servidor(String)
     case decodificacion(Error)
     case red(Error)
 
@@ -30,6 +31,7 @@ enum APIError: LocalizedError {
         switch self {
         case .respuestaInvalida: "El servidor devolvió una respuesta inválida."
         case .http(let codigo): "El servidor respondió con error \(codigo)."
+        case .servidor(let mensaje): mensaje
         case .decodificacion: "No se pudieron leer los datos recibidos."
         case .red: "No hay conexión con el servidor."
         }
@@ -96,8 +98,23 @@ struct APIClient {
             throw APIError.red(error)
         }
         guard let http = respuesta as? HTTPURLResponse else { throw APIError.respuestaInvalida }
-        guard (200..<300).contains(http.statusCode) else { throw APIError.http(http.statusCode) }
+        guard (200..<300).contains(http.statusCode) else {
+            if let cuerpo = try? Self.decoder.decode(RespuestaError.self, from: datos) {
+                throw APIError.servidor(cuerpo.mensaje)
+            }
+            throw APIError.http(http.statusCode)
+        }
         return datos
+    }
+
+    private struct RespuestaError: Decodable {
+        let error: String
+        let detalles: [String: [String]]?
+
+        var mensaje: String {
+            let primero = detalles?.values.compactMap(\.first).first
+            return primero ?? error
+        }
     }
 }
 
