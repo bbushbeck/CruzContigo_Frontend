@@ -54,6 +54,7 @@ struct PersonasView: View {
 }
 
 struct MasView: View {
+    @Environment(AuthViewModel.self) private var auth
     @State private var ruta: [Ruta] = []
     @State private var confirmarCierre = false
     @AppStorage("onboardingCompletado") private var onboardingCompletado = true
@@ -103,7 +104,10 @@ struct MasView: View {
             .conDestinos()
             .confirmationDialog("¿Cerrar sesión?", isPresented: $confirmarCierre, titleVisibility: .visible) {
                 Button("Cerrar sesión", role: .destructive) {
-                    withAnimation { onboardingCompletado = false }
+                    Task {
+                        await auth.cerrarSesion()
+                        withAnimation { onboardingCompletado = false }
+                    }
                 }
                 Button("Cancelar", role: .cancel) {}
             } message: {

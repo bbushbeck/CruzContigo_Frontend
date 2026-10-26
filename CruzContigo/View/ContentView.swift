@@ -3,17 +3,18 @@ import SwiftUI
 
 struct ContentView: View {
     @AppStorage("onboardingCompletado") private var onboardingCompletado = false
+    @State private var auth = AuthViewModel()
     @State private var familiaresStore = FamiliaresStore()
     @State private var recordatoriosStore = RecordatoriosStore()
     @State private var preferencias = Preferencias.compartidas
 
     var body: some View {
         Group {
-            if onboardingCompletado {
+            if auth.estaAutenticado && onboardingCompletado {
                 MainTabView()
                     .transition(.opacity)
             } else {
-                OnboardingFlowView {
+                OnboardingFlowView(auth: auth) {
                     withAnimation {
                         onboardingCompletado = true
                     }
@@ -21,6 +22,7 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
+        .environment(auth)
         .environment(familiaresStore)
         .environment(recordatoriosStore)
         .environment(preferencias)
@@ -34,6 +36,7 @@ enum PasoOnboarding: Hashable {
 }
 
 struct OnboardingFlowView: View {
+    @Bindable var auth: AuthViewModel
     let terminar: () -> Void
 
     @State private var ruta: [PasoOnboarding] = []
@@ -41,6 +44,7 @@ struct OnboardingFlowView: View {
     var body: some View {
         NavigationStack(path: $ruta) {
             VerifyPhoneView(
+                viewModel: auth,
                 onVerificado: {
                     ruta.append(.seleccionarRol)
                 }
