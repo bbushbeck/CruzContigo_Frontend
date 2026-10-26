@@ -6,11 +6,6 @@
 	objectVersion = 110;
 	objects = {
 
-/* Begin PBXFileReference section */
-		4C2BC58A3088623500654017 /* CruzContigo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CruzContigo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		4C2BC5A03088700000654017 /* CruzContigoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CruzContigoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-/* End PBXFileReference section */
-
 /* Begin PBXContainerItemProxy section */
 		4C2BC5A73088700000654017 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,15 +16,10 @@
 		};
 /* End PBXContainerItemProxy section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		4C2BC5A93088700000654017 /* Exceptions for "CruzContigoTests" folder in "CruzContigoTests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				AuthViewModelTests.swift,
-			);
-			target = 4C2BC5A23088700000654017 /* CruzContigoTests */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+/* Begin PBXFileReference section */
+		4C2BC58A3088623500654017 /* CruzContigo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CruzContigo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C2BC5A03088700000654017 /* CruzContigoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CruzContigoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4C2BC58C3088623500654017 /* CruzContigo */ = {
@@ -44,9 +34,6 @@
 		};
 		4C2BC5A13088700000654017 /* CruzContigoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				4C2BC5A93088700000654017 /* Exceptions for "CruzContigoTests" folder in "CruzContigoTests" target */,
-			);
 			path = CruzContigoTests;
 			sourceTree = "<group>";
 		};
