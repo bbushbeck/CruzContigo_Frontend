@@ -44,25 +44,3 @@ private struct UnconfiguredMedicationService: MedicationService {
     func save(_ medication: Medication, updating: Bool) async throws -> Medication { throw error }
     func delete(_ medication: Medication) async throws { throw error }
 }
-
-/// Solo para vistas previas; la navegación de la app utiliza RemoteMedicationService.
-actor DemoMedicationService: MedicationService {
-    private var medications = Medication.examples
-
-    func fetchMedications(for recipientID: UUID) async throws -> [Medication] {
-        medications.filter { $0.recipientID == recipientID }
-    }
-
-    func save(_ medication: Medication, updating: Bool) async throws -> Medication {
-        if let index = medications.firstIndex(where: { $0.id == medication.id }) {
-            medications[index] = medication
-        } else {
-            medications.append(medication)
-        }
-        return medication
-    }
-
-    func delete(_ medication: Medication) async throws {
-        medications.removeAll { $0.id == medication.id }
-    }
-}
