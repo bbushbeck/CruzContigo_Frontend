@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 /// Formulario para agregar o editar un tratamiento. La validación vive en `MedicationDraft`.
 struct MedicationFormView: View {
@@ -10,6 +12,10 @@ struct MedicationFormView: View {
     @State private var draft: MedicationDraft
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var recetaSelection: PhotosPickerItem?
+    @State private var recetaExtraida: RecetaExtraida?
+    @State private var isReadingReceta = false
+    @State private var recetaError: String?
 
     init(recipientID: UUID, model: MedicationViewModel, editing: Medication? = nil) {
         self.recipientID = recipientID
@@ -20,6 +26,55 @@ struct MedicationFormView: View {
 
     var body: some View {
         Form {
+            if #available(iOS 27.0, *) {
+                Section("Leer receta (prueba)") {
+                    PhotosPicker(selection: $recetaSelection, matching: .images) {
+                        Label("Seleccionar foto de receta", systemImage: "doc.viewfinder")
+                    }
+                    .disabled(isReadingReceta || isSaving)
+
+                    if isReadingReceta {
+                        ProgressView("Leyendo receta...")
+                    }
+
+                    if let recetaError {
+                        Text(recetaError)
+                            .font(.app(.footnote))
+                            .foregroundStyle(MedicalStyle.red)
+                    }
+
+                    if let recetaExtraida {
+                        if recetaExtraida.medicamentos.isEmpty {
+                            Text("No se detectaron medicamentos.")
+                        } else {
+                            ForEach(recetaExtraida.medicamentos.indices, id: \.self) { index in
+                                let medicamento = recetaExtraida.medicamentos[index]
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(medicamento.nombre).font(.app(.headline))
+                                    Text("Dosis: \([medicamento.dosis, medicamento.unidad].compactMap { $0 }.joined(separator: " "))")
+                                    if let presentacion = medicamento.presentacion {
+                                        Text("Presentación: \(presentacion)")
+                                    }
+                                    if let frecuencia = medicamento.frecuencia {
+                                        Text("Frecuencia: \(frecuencia)")
+                                    }
+                                    if let indicacion = medicamento.indicacion {
+                                        Text("Indicación: \(indicacion)")
+                                    }
+                                }
+                            }
+                        }
+                        Text("Resultado de prueba: todavía no llena ni guarda el formulario.")
+                            .font(.app(.footnote))
+                            .foregroundStyle(Color.textoSuave)
+                    }
+                }
+                .onChange(of: recetaSelection) { _, item in
+                    guard let item else { return }
+                    Task { await leerReceta(item) }
+                }
+            }
+
             Section("Medicamento") {
                 TextField("Nombre del medicamento", text: $draft.name)
                 TextField("Presentación (opcional, ej. tableta)", text: $draft.presentation)
@@ -57,7 +112,7 @@ struct MedicationFormView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancelar") { dismiss() }
-                    .disabled(isSaving)
+                    .disabled(isSaving || isReadingReceta)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar") {
@@ -73,10 +128,10 @@ struct MedicationFormView: View {
                         }
                     }
                 }
-                .disabled(!draft.isValid || isSaving)
+                .disabled(!draft.isValid || isSaving || isReadingReceta)
             }
         }
-        .interactiveDismissDisabled(isSaving)
+        .interactiveDismissDisabled(isSaving || isReadingReceta)
         .alert("No se pudo guardar", isPresented: Binding(
             get: { saveError != nil },
             set: { if !$0 { saveError = nil } }
@@ -84,5 +139,26 @@ struct MedicationFormView: View {
             Button("Aceptar", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "") }
         .tint(MedicalStyle.red)
+    }
+
+    @available(iOS 27.0, *)
+    private func leerReceta(_ item: PhotosPickerItem) async {
+        isReadingReceta = true
+        recetaError = nil
+        recetaExtraida = nil
+        defer {
+            isReadingReceta = false
+            recetaSelection = nil
+        }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let imagen = UIImage(data: data) else {
+                throw RecetaExtractorError.imagenInvalida
+            }
+            recetaExtraida = try await RecetaExtractor().extraer(desde: imagen)
+        } catch {
+            recetaError = "No se pudo leer la receta: \(error.localizedDescription)"
+        }
     }
 }
