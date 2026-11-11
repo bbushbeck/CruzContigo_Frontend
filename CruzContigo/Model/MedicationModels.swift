@@ -12,8 +12,6 @@ enum MedicationStatus: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Las fechas DATE viajan como YYYY-MM-DD, sin conversión a otro huso horario.
-/// Los valores DECIMAL viajan como texto, separados de la unidad.
 struct Medication: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var recipientID: UUID
@@ -28,7 +26,6 @@ struct Medication: Identifiable, Codable, Equatable {
     var stock: String? = nil
     var refillThresholdDays: Int = 5
 
-    // El esquema no tiene estado: un tratamiento es anterior si su fin ya pasó.
     var status: MedicationStatus {
         if let endDate, endDate < MedicationDay.string(from: .now) { return .discontinued }
         return .active

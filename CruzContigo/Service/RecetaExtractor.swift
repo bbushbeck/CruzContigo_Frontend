@@ -28,6 +28,9 @@ struct RecetaExtractor {
         guard case .available = SystemLanguageModel.default.availability else {
             throw RecetaExtractorError.modeloNoDisponible
         }
+        guard let cgImage = imagen.cgImage else {
+            throw RecetaExtractorError.imagenInvalida
+        }
 
         let session = LanguageModelSession(
             instructions: """
@@ -47,7 +50,7 @@ struct RecetaExtractor {
             generating: RecetaExtraida.self
         ) {
             "Lee esta receta y extrae todos sus medicamentos."
-            Attachment(imagen)
+            Attachment(cgImage)
         }
 
         return response.content

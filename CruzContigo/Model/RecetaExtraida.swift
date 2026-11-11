@@ -34,3 +34,14 @@ struct RecetaExtraida {
     @Guide(description: "Todos los medicamentos visibles en la receta")
     var medicamentos: [MedicamentoExtraido]
 }
+
+extension MedicationDraft {
+    mutating func aplicar(_ medicamento: MedicamentoExtraido) {
+        name = medicamento.nombre
+        dose = medicamento.dosis ?? ""
+        unit = medicamento.unidad ?? ""
+        presentation = medicamento.presentacion ?? ""
+        frequency = medicamento.frecuencia ?? ""
+        indication = medicamento.indicacion ?? ""
+    }
+}

@@ -16,6 +16,7 @@ struct MedicationFormView: View {
     @State private var recetaExtraida: RecetaExtraida?
     @State private var isReadingReceta = false
     @State private var recetaError: String?
+    @State private var recetaAplicada = false
 
     init(recipientID: UUID, model: MedicationViewModel, editing: Medication? = nil) {
         self.recipientID = recipientID
@@ -27,7 +28,7 @@ struct MedicationFormView: View {
     var body: some View {
         Form {
             if #available(iOS 27.0, *) {
-                Section("Leer receta (prueba)") {
+                Section("Leer receta") {
                     PhotosPicker(selection: $recetaSelection, matching: .images) {
                         Label("Seleccionar foto de receta", systemImage: "doc.viewfinder")
                     }
@@ -45,26 +46,39 @@ struct MedicationFormView: View {
 
                     if let recetaExtraida {
                         if recetaExtraida.medicamentos.isEmpty {
-                            Text("No se detectaron medicamentos.")
+                            Text("No se detectaron medicamentos. Puedes capturarlos manualmente.")
                         } else {
+                            Text("Se detectaron varios medicamentos. Elige cuál quieres aplicar al formulario.")
+                                .font(.app(.footnote))
+                                .foregroundStyle(Color.textoSuave)
                             ForEach(recetaExtraida.medicamentos.indices, id: \.self) { index in
                                 let medicamento = recetaExtraida.medicamentos[index]
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(medicamento.nombre).font(.app(.headline))
-                                    Text("Dosis: \([medicamento.dosis, medicamento.unidad].compactMap { $0 }.joined(separator: " "))")
-                                    if let presentacion = medicamento.presentacion {
-                                        Text("Presentación: \(presentacion)")
+                                let dosis = [medicamento.dosis, medicamento.unidad]
+                                    .compactMap { $0 }
+                                    .joined(separator: " ")
+                                Button {
+                                    aplicar(medicamento)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(medicamento.nombre)
+                                            .font(.app(.headline))
+                                            .foregroundStyle(.primary)
+                                        Text(dosis.isEmpty ? "Dosis no detectada" : dosis)
+                                            .foregroundStyle(Color.textoSuave)
+                                        Text("Usar este medicamento")
+                                            .font(.app(.footnote))
+                                            .foregroundStyle(MedicalStyle.red)
                                     }
-                                    if let frecuencia = medicamento.frecuencia {
-                                        Text("Frecuencia: \(frecuencia)")
-                                    }
-                                    if let indicacion = medicamento.indicacion {
-                                        Text("Indicación: \(indicacion)")
-                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
-                        Text("Resultado de prueba: todavía no llena ni guarda el formulario.")
+                    }
+
+                    if recetaAplicada {
+                        Label("Formulario actualizado. Revisa y completa los datos antes de guardar.",
+                              systemImage: "checkmark.circle.fill")
                             .font(.app(.footnote))
                             .foregroundStyle(Color.textoSuave)
                     }
@@ -146,6 +160,7 @@ struct MedicationFormView: View {
         isReadingReceta = true
         recetaError = nil
         recetaExtraida = nil
+        recetaAplicada = false
         defer {
             isReadingReceta = false
             recetaSelection = nil
@@ -156,9 +171,20 @@ struct MedicationFormView: View {
                   let imagen = UIImage(data: data) else {
                 throw RecetaExtractorError.imagenInvalida
             }
-            recetaExtraida = try await RecetaExtractor().extraer(desde: imagen)
+            let receta = try await RecetaExtractor().extraer(desde: imagen)
+            if receta.medicamentos.count == 1, let medicamento = receta.medicamentos.first {
+                aplicar(medicamento)
+            } else {
+                recetaExtraida = receta
+            }
         } catch {
             recetaError = "No se pudo leer la receta: \(error.localizedDescription)"
         }
+    }
+
+    private func aplicar(_ medicamento: MedicamentoExtraido) {
+        draft.aplicar(medicamento)
+        recetaExtraida = nil
+        recetaAplicada = true
     }
 }
