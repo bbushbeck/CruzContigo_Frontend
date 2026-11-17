@@ -38,3 +38,16 @@ La API tiene ocho pruebas de integración con una copia local del SQL de Aiven.
 La compilación y la prueba visual
 de esta app deben realizarse en macOS con Xcode; el entorno Linux no dispone del
 SDK de iOS.
+
+## Frida
+
+Desde Inicio, abre **Habla con Frida** y escribe o dicta una consulta en español.
+Por ejemplo, «¿Qué medicamentos toma mi mamá hoy?», «¿Qué recordatorios tengo
+mañana?» o «Llévame a Recordatorios». Puedes revisar la transcripción antes de
+enviarla. El dictado requiere permiso de micrófono y reconocimiento de voz, y un
+dispositivo con reconocimiento en español disponible sin conexión.
+
+Frida consulta la API configurada en `CRUZ_API_URL`. Los cambios se guardan desde
+las pantallas de Medicamentos y Recordatorios. La API debe tener instalada la
+tabla `recordatorio_usuario` para utilizar Recordatorios. Las notificaciones
+se programan localmente en el dispositivo donde se guarda el recordatorio.

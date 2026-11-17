@@ -1,56 +1,37 @@
-//
-//  Recordatorio.swift
-//  Recordatorio
-//
-//  Created by María Fernanda Espinosa Vásquez on 20/10/26.
-//
-
 import SwiftUI
-import Observation
-
-private let rojo = Color.brandRed
-private let rosa = Color.tintaSuave
-
-struct Recordatorio: Identifiable {
-    let id = UUID()
-    var titulo: String
-    var familiarID: UUID
-    var fecha: Date
-    var completado = false
-}
-
-/// Recordatorios de la sesión, compartidos entre pantallas.
-@Observable
-final class RecordatoriosStore {
-    var recordatorios: [Recordatorio] = []
-
-    func agregar(_ recordatorio: Recordatorio) {
-        recordatorios.append(recordatorio)
-        recordatorios.sort { $0.fecha < $1.fecha }
-    }
-}
 
 struct RecordatoriosView: View {
-    /// Si se indica, solo se muestran los recordatorios de ese familiar.
     var familiarID: UUID? = nil
     var mostrarAtras = true
 
     @Environment(FamiliaresStore.self) private var familiares
-    @Environment(RecordatoriosStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @State private var mostrarFormulario = false
+    @State private var recordatorios: [Recordatorio] = []
+    @State private var cargando = false
+    @State private var guardando = false
+    @State private var mensajeCarga: String?
+    @State private var mensajeOperacion: String?
+    @State private var formulario: Formulario?
+    @State private var porEliminar: Recordatorio?
 
-    private var familiar: Familiar? {
-        familiarID.flatMap { id in familiares.familiares.first { $0.id == id } }
+    private let servicio = RecordatoriosService()
+    private let notificaciones = NotificationHandler()
+
+    private struct Formulario: Identifiable {
+        let id = UUID()
+        var recordatorio: Recordatorio? = nil
+    }
+
+    private var visibles: [Recordatorio] {
+        recordatorios.filter { familiarID == nil || $0.familiarID == familiarID }
+            .sorted { $0.fecha < $1.fecha }
     }
 
     private func nombre(de id: UUID) -> String {
-        familiares.familiares.first { $0.id == id }?.nombre ?? "Familiar"
+        familiares.familiares.first { $0.id == id }?.nombreCompleto ?? "Familiar"
     }
 
     var body: some View {
-        @Bindable var store = store
-
         VStack(spacing: 0) {
             if mostrarAtras {
                 HStack {
@@ -63,173 +44,242 @@ struct RecordatoriosView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-
                     Text("Mis recordatorios")
                         .font(.app(.title2).bold())
-
-                    Text(familiar.map { "Organiza el cuidado de \($0.nombre)." } ?? "Organiza el cuidado de tus familiares.")
-                        .font(.app(.subheadline))
-                        .foregroundStyle(Color.textoSuave)
-
-                    Text("Próximos recordatorios")
-                        .font(.app(.headline))
-
-                    if !store.recordatorios.contains(where: { familiarID == nil || $0.familiarID == familiarID }) {
-                        ContentUnavailableView("Sin recordatorios", systemImage: "bell",
-                            description: Text("Agrega uno para recibir una notificación."))
+                        .accessibilityAddTraits(.isHeader)
+                    if let familiarID {
+                        Text(nombre(de: familiarID))
+                            .font(.app(.subheadline))
+                            .foregroundStyle(Color.textoSuave)
                     }
 
-                    ForEach($store.recordatorios) { $recordatorio in
-                        if familiarID == nil || recordatorio.familiarID == familiarID {
-                            HStack(spacing: 12) {
-                                Image(systemName: "bell.fill")
-                                    .icono(.mediano)
-                                    .foregroundStyle(rojo)
-                                    .padding(12)
-
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(recordatorio.titulo)
-                                        .font(.app(.subheadline).bold())
-                                        .strikethrough(recordatorio.completado)
-
-                                    Text(nombre(de: recordatorio.familiarID))
-                                        .font(.app(.caption))
-                                        .foregroundStyle(Color.textoSuave)
-
-                                    Text(recordatorio.fecha,
-                                         format: .dateTime
-                                            .day()
-                                            .month()
-                                            .hour()
-                                            .minute())
-                                        .font(.app(.caption))
-                                        .foregroundStyle(rojo)
-                                }
-
-                                Spacer()
-
-                                Button {
-                                    recordatorio.completado.toggle()
-                                } label: {
-                                    Image(systemName:
-                                        recordatorio.completado
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                                    )
-                                    .icono(.seleccion)
-                                    .foregroundStyle(rojo)
-                                }
-                            }
-                            .padding()
-                            .background(rosa)
-                            .clipShape(RoundedRectangle(cornerRadius: 15))
+                    if cargando && visibles.isEmpty {
+                        ProgressView("Cargando recordatorios…")
+                    } else if let mensajeCarga {
+                        EstadoErrorView(mensaje: mensajeCarga) {
+                            Task { await cargar() }
                         }
+                    } else if visibles.isEmpty {
+                        ContentUnavailableView("Sin recordatorios", systemImage: "bell")
+                    }
+
+                    ForEach(visibles) { recordatorio in
+                        fila(recordatorio)
                     }
 
                     Button {
-                        mostrarFormulario = true
+                        formulario = Formulario()
                     } label: {
                         Label("Agregar recordatorio", systemImage: "plus")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.rojoSolido)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .disabled(familiares.familiares.isEmpty)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(familiares.familiares.isEmpty || guardando || cargando)
                 }
                 .padding()
             }
+            .refreshable { await cargar() }
         }
-        .sheet(isPresented: $mostrarFormulario) {
-            NuevoRecordatorioView(
+        .task {
+            if familiares.estado == .inicial { await familiares.cargar() }
+            await cargar()
+        }
+        .sheet(item: $formulario) { formulario in
+            EditorRecordatorioView(
                 familiares: familiares.familiares,
-                familiarInicial: familiarID ?? familiares.familiares.first?.id
-            ) { nuevo in
-                store.agregar(nuevo)
+                familiarInicial: familiarID ?? familiares.familiares.first?.id,
+                recordatorio: formulario.recordatorio
+            ) { datos in
+                try await guardar(datos, id: formulario.recordatorio?.id)
             }
+        }
+        .confirmationDialog(
+            "Eliminar recordatorio",
+            isPresented: Binding(get: { porEliminar != nil }, set: { if !$0 { porEliminar = nil } }),
+            titleVisibility: .visible,
+            presenting: porEliminar
+        ) { recordatorio in
+            Button("Eliminar", role: .destructive) {
+                Task { await eliminar(recordatorio) }
+            }
+        } message: { recordatorio in
+            Text(recordatorio.titulo)
+        }
+        .alert("No se pudo actualizar", isPresented: Binding(
+            get: { mensajeOperacion != nil }, set: { if !$0 { mensajeOperacion = nil } }
+        )) {
+            Button("Aceptar", role: .cancel) {}
+        } message: {
+            Text(mensajeOperacion ?? "")
+        }
+    }
+
+    private func fila(_ recordatorio: Recordatorio) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(recordatorio.titulo)
+                    .font(.app(.subheadline).bold())
+                    .strikethrough(recordatorio.completado)
+                Text(nombre(de: recordatorio.familiarID))
+                    .font(.app(.caption))
+                    .foregroundStyle(Color.textoSuave)
+                Text(recordatorio.fechaCorta)
+                    .font(.app(.caption))
+                    .foregroundStyle(Color.brandRed)
+            }
+            Spacer()
+            Button {
+                Task {
+                    var datos = recordatorio.datos
+                    datos.completado.toggle()
+                    do {
+                        try await guardar(datos, id: recordatorio.id)
+                    } catch {
+                        mensajeOperacion = error.localizedDescription
+                    }
+                }
+            } label: {
+                Image(systemName: recordatorio.completado ? "checkmark.circle.fill" : "circle")
+                    .icono(.seleccion)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel(recordatorio.completado ? "Marcar como pendiente" : "Marcar como completado")
+            .buttonStyle(.borderless)
+            Menu {
+                Button("Editar", systemImage: "pencil") {
+                    formulario = Formulario(recordatorio: recordatorio)
+                }
+                Button("Eliminar", systemImage: "trash", role: .destructive) {
+                    porEliminar = recordatorio
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Opciones de \(recordatorio.titulo)")
+        }
+        .disabled(guardando || cargando)
+        .padding(12)
+        .background(Color.tintaSuave, in: RoundedRectangle(cornerRadius: 15))
+    }
+
+    private func cargar() async {
+        guard !cargando, !guardando else { return }
+        cargando = true
+        defer { cargando = false }
+        do {
+            let respuesta = try await servicio.listar()
+            guard !Task.isCancelled else { return }
+            recordatorios = respuesta
+            mensajeCarga = nil
+        } catch {
+            if !Task.isCancelled { mensajeCarga = error.localizedDescription }
+        }
+    }
+
+    private func guardar(_ datos: DatosRecordatorio, id: UUID?) async throws {
+        guard !cargando, !guardando else {
+            throw APIError.servidor("Espera a que termine la actualización.")
+        }
+        guardando = true
+        defer { guardando = false }
+        let guardado = try await servicio.guardar(datos, id: id)
+        recordatorios.removeAll { $0.id == guardado.id }
+        recordatorios.append(guardado)
+        await notificaciones.actualizar(guardado, nombre: nombre(de: guardado.familiarID))
+    }
+
+    private func eliminar(_ recordatorio: Recordatorio) async {
+        guard !cargando, !guardando else { return }
+        guardando = true
+        defer { guardando = false }
+        do {
+            try await servicio.eliminar(id: recordatorio.id)
+            recordatorios.removeAll { $0.id == recordatorio.id }
+            notificaciones.cancelar(id: recordatorio.id)
+        } catch {
+            mensajeOperacion = error.localizedDescription
         }
     }
 }
 
-struct NuevoRecordatorioView: View {
+private struct EditorRecordatorioView: View {
     @Environment(\.dismiss) private var dismiss
 
     let familiares: [Familiar]
-    var onGuardar: (Recordatorio) -> Void
-    let notify = NotificationHandler()
-
-    @State private var titulo = ""
+    let recordatorio: Recordatorio?
+    let onGuardar: (DatosRecordatorio) async throws -> Void
+    @State private var titulo: String
     @State private var familiarID: UUID?
-    @State private var fecha = Date().addingTimeInterval(300)
+    @State private var fecha: Date
+    @State private var guardando = false
+    @State private var error: String?
 
-    init(familiares: [Familiar], familiarInicial: UUID?, onGuardar: @escaping (Recordatorio) -> Void) {
+    init(
+        familiares: [Familiar], familiarInicial: UUID?, recordatorio: Recordatorio?,
+        onGuardar: @escaping (DatosRecordatorio) async throws -> Void
+    ) {
         self.familiares = familiares
+        self.recordatorio = recordatorio
         self.onGuardar = onGuardar
-        _familiarID = State(initialValue: familiarInicial)
+        _titulo = State(initialValue: recordatorio?.titulo ?? "")
+        _familiarID = State(initialValue: recordatorio?.familiarID ?? familiarInicial)
+        _fecha = State(initialValue: recordatorio?.fecha ?? Date().addingTimeInterval(300))
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 TextField("Nombre del recordatorio", text: $titulo)
-
                 Picker("Familiar", selection: $familiarID) {
                     ForEach(familiares) { familiar in
-                        Text(familiar.nombre).tag(Optional(familiar.id))
+                        Text(familiar.nombreCompleto).tag(Optional(familiar.id))
                     }
                 }
-
-                DatePicker(
-                    "Fecha y hora",
-                    selection: $fecha,
-                    in: Date()...,
-                    displayedComponents: [.date, .hourAndMinute]
-                )
+                if let recordatorio {
+                    DatePicker("Fecha y hora", selection: $fecha, in: min(recordatorio.fecha, .now)...)
+                } else {
+                    DatePicker("Fecha y hora", selection: $fecha, in: Date.now...)
+                }
+                if let error {
+                    Text(error).foregroundStyle(Color.brandRed)
+                }
             }
-            .navigationTitle("Nuevo recordatorio")
-            .onAppear {
-                notify.askPermission()
-            }
+            .disabled(guardando)
+            .navigationTitle(recordatorio == nil ? "Nuevo recordatorio" : "Editar recordatorio")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancelar") { dismiss() }.disabled(guardando)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Guardar") {
-                        guard let familiarID else { return }
-                        let nuevo = Recordatorio(
-                            titulo: titulo,
-                            familiarID: familiarID,
-                            fecha: fecha
-                        )
-                        let nombre = familiares.first { $0.id == familiarID }?.nombre ?? ""
-
-                        notify.sendNotification(
-                            date: fecha,
-                            type: "date",
-                            title: "CruzContigo ❤️",
-                            body: "\(nombre): \(titulo)"
-                        )
-
-                        onGuardar(nuevo)
-                        dismiss()
+                        Task { await guardar() }
                     }
-
-                    .disabled(familiarID == nil || titulo.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty)
+                    .disabled(guardando || familiarID == nil || tituloLimpio.isEmpty || tituloLimpio.count > 120)
                 }
             }
         }
-        .tint(rojo)
+        .interactiveDismissDisabled(guardando)
+        .tint(.brandRed)
     }
-}
 
-#Preview {
-    NavigationStack {
-        RecordatoriosView()
+    private var tituloLimpio: String {
+        titulo.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    .environment(FamiliaresStore())
-    .environment(RecordatoriosStore())
+
+    private func guardar() async {
+        guard !guardando, let familiarID else { return }
+        guardando = true
+        error = nil
+        defer { guardando = false }
+        do {
+            try await onGuardar(DatosRecordatorio(
+                titulo: tituloLimpio, familiarID: familiarID, fecha: fecha,
+                completado: recordatorio?.completado ?? false
+            ))
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 }
