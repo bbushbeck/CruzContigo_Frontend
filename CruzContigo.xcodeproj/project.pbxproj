@@ -27,11 +27,6 @@
 			path = CruzContigo;
 			sourceTree = "<group>";
 		};
-		4C2BC59830886E6200654017 /* Funcionalidades */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Funcionalidades;
-			sourceTree = "<group>";
-		};
 		4C2BC5A13088700000654017 /* CruzContigoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CruzContigoTests;
@@ -58,7 +53,6 @@
 			children = (
 				4C2BC58C3088623500654017 /* CruzContigo */,
 				4C2BC58B3088623500654017 /* Products */,
-				4C2BC59830886E6200654017 /* Funcionalidades */,
 				4C2BC5A13088700000654017 /* CruzContigoTests */,
 			);
 			sourceTree = "<group>";
@@ -87,7 +81,6 @@
 			);
 			fileSystemSynchronizedGroups = (
 				4C2BC58C3088623500654017 /* CruzContigo */,
-				4C2BC59830886E6200654017 /* Funcionalidades */,
 			);
 			name = CruzContigo;
 			productName = CruzContigo;
@@ -315,6 +308,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T3M2UVT4LZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -346,6 +340,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T3M2UVT4LZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
