@@ -8,18 +8,9 @@ struct ContentView: View {
     @State private var recordatoriosStore = RecordatoriosStore()
     @State private var preferencias = Preferencias.compartidas
 
-    private var puedeUsarApp: Bool {
-        #if DEBUG
-        // PRUEBAS TEMPORALES: entra directamente sin teléfono ni onboarding.
-        true
-        #else
-        auth.estaAutenticado && onboardingCompletado
-        #endif
-    }
-
     var body: some View {
         Group {
-            if puedeUsarApp {
+            if auth.estaAutenticado && onboardingCompletado {
                 MainTabView()
                     .transition(.opacity)
             } else {

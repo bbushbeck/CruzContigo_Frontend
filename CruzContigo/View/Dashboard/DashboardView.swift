@@ -14,7 +14,6 @@ struct DashboardView: View {
     @AppStorage(ClavesApp.primerosPasosOcultos) private var primerosPasosOcultos = false
     @State private var ruta: [Ruta] = []
     @State private var mostrarEmergencia = false
-    @State private var mostrarPruebaReceta = false
     @Environment(\.openURL) private var abrirURL
 
     private var seleccionada: Familiar? {
@@ -27,19 +26,6 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     encabezado
                     saludo
-                    #if DEBUG
-                    if #available(iOS 27.0, *) {
-                        VStack(spacing: 8) {
-                            PrimaryButton(title: "Probar lectura de receta") {
-                                mostrarPruebaReceta = true
-                            }
-                            Text("Acceso temporal de pruebas: no necesitas familiares ni conexión al servidor.")
-                                .font(.app(.footnote))
-                                .foregroundColor(.textoSuave)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    #endif
                     seccionPersonas
                     Button { mostrarEmergencia = true } label: { EmergenciaCard() }
                         .buttonStyle(.plain)
@@ -76,14 +62,6 @@ struct DashboardView: View {
                 } else {
                     ruta.append(.agregarFamiliar)
                 }
-            }
-        }
-        .sheet(isPresented: $mostrarPruebaReceta) {
-            NavigationStack {
-                MedicationFormView(
-                    recipientID: CareRecipient.maria.id,
-                    model: MedicationViewModel(service: DemoMedicationService())
-                )
             }
         }
     }
