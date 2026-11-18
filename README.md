@@ -1,54 +1,42 @@
-# CruzContigo
+# CruzContigo · Frontend iOS
 
-## Medicamentos conectados a la API
+CruzContigo es una app para personas cuidadoras. Permite consultar la información de sus familiares, organizar medicamentos y recordatorios, y acceder a esas pantallas por texto o voz con Frida.
 
-La pantalla de medicamentos registra, lista, edita y elimina tratamientos del
-familiar seleccionado mediante `/familiares/:id/medicamentos`. Los cambios se
-guardan en MySQL a través del backend; el servicio de demostración queda solo
-para previews. No incluye recordatorios automáticos en este avance.
+## Funciones disponibles
 
-1. Actualizar también `CruzContigo_Backend` y ejecutar `npm ci` para generar el
-   cliente Prisma actualizado. La API y el formulario se ajustan a la definición
-   existente de Aiven. Ver `docs/medicamentos.md` del backend. No crear otra tabla
-   ni ejecutar un reset o `db push` en Aiven.
-2. Iniciar el backend en la Mac con `npm run dev`, conservando su `.env` de Aiven
-   y su certificado CA.
-3. Abrir `CruzContigo.xcodeproj` con Xcode compatible con iOS 26 y ejecutar en el
-   simulador. En Debug se usa `http://localhost:3000`. También puede configurarse
-   `CRUZ_API_URL` en Product → Scheme → Edit Scheme → Run → Arguments → Environment
-   Variables. La app se conecta al backend, nunca directamente a Aiven; no poner
-   credenciales de MySQL en Xcode. En un iPhone físico, localhost apunta al teléfono,
-   por lo que se necesita una dirección de API accesible desde el dispositivo.
-
-Para comprobar el avance: registrar un familiar, abrir Medicamentos, agregar un
-tratamiento, salir y volver a entrar para verificar que se conserva, y eliminarlo
-desde su detalle. Cambiar de familiar debe mostrar su propia lista. Si el backend
-no está disponible, debe aparecer un error al cargar o guardar; el formulario no
-debe cerrarse como si hubiera guardado. Se puede reintentar con “Actualizar
-medicamentos”.
-
-El formulario separa dosis numérica y unidad, admite presentación, frecuencia,
-indicación y existencias opcionales, y guarda el umbral de resurtido (5 días por
-defecto). Acepta coma o punto decimal, con un máximo de dos decimales. El umbral
-todavía no genera alertas. Los tratamientos finalizados antes de hoy aparecen en
-Anteriores; el estado se calcula a partir de la fecha de fin. Ya no se solicitan
-vía ni médico porque esas columnas no existen en la tabla.
-
-La API tiene ocho pruebas de integración con una copia local del SQL de Aiven.
-La compilación y la prueba visual
-de esta app deben realizarse en macOS con Xcode; el entorno Linux no dispone del
-SDK de iOS.
+- **Inicio de sesión.** Acceso con número de teléfono y código de verificación. La sesión se guarda en el Keychain de iOS.
+- **Personas y ficha médica.** Registro y consulta de familiares. La ficha permite editar datos como alergias, padecimientos, tipo de sangre y contactos médicos.
+- **Medicamentos.** Alta, consulta, edición y eliminación de tratamientos por familiar. El formulario guarda dosis, unidad, frecuencia, fechas, existencias y umbral de resurtido. Los tratamientos finalizados aparecen en **Anteriores**.
+- **Lectura de recetas.** En iOS 27 con Apple Intelligence disponible, el formulario permite seleccionar una foto de una receta y extraer datos del medicamento. Puedes revisar y corregir los campos antes de guardar. La captura manual está disponible.
+- **Recordatorios.** Puedes crear, editar, completar y eliminar avisos de una sola vez para un familiar. Se guardan en la API. El dispositivo donde se guarda el aviso programa la notificación local si tiene permiso.
+- **Accesibilidad.** Ajustes de tamaño y grosor del texto, tipografía OpenDyslexic, contraste, apariencia, movimiento y vibración. La interfaz incluye etiquetas para VoiceOver.
 
 ## Frida
 
-Desde Inicio, abre **Habla con Frida** y escribe o dicta una consulta en español.
-Por ejemplo, «¿Qué medicamentos toma mi mamá hoy?», «¿Qué recordatorios tengo
-mañana?» o «Llévame a Recordatorios». Puedes revisar la transcripción antes de
-enviarla. El dictado requiere permiso de micrófono y reconocimiento de voz, y un
-dispositivo con reconocimiento en español disponible sin conexión.
+Desde **Inicio**, abre **Habla con Frida**. Puedes escribir una consulta o dictarla y revisar la transcripción antes de enviarla.
 
-Frida consulta la API configurada en `CRUZ_API_URL`. Los cambios se guardan desde
-las pantallas de Medicamentos y Recordatorios. La API usa la tabla existente
-`recordatorio` y conserva el acceso del familiar en su red de cuidado. Los
-familiares registrados con una sesión iniciada quedan vinculados a tu cuenta.
-Los avisos se programan en el dispositivo donde se guarda el recordatorio.
+- «¿Qué medicamentos toma mi mamá hoy?»
+- «¿Qué recordatorios tengo mañana?»
+- «Llévame a Recordatorios»
+
+Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
+
+## Ejecutar el proyecto
+
+1. Usa macOS con Xcode y el SDK de iOS 27 para compilar la versión actual. El proyecto tiene iOS 26 como mínimo de ejecución. La lectura de recetas requiere iOS 27.
+2. Configura `CruzContigo_Backend` con su `.env` y ejecuta `npm ci` y `npm run dev` desde ese repositorio.
+3. Abre `CruzContigo.xcodeproj`, selecciona el esquema `CruzContigo` y ejecuta con **⌘R**.
+4. En Debug, el simulador usa `http://localhost:3000`. Para usar otra URL, configura `CRUZ_API_URL` en **Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables**. En un iPhone físico, usa una dirección del backend accesible desde el dispositivo.
+5. Ingresa tu número de teléfono. En desarrollo, el código de verificación aparece en la terminal del backend.
+
+La app se conecta a MySQL a través de la API. Las credenciales de la base de datos y el certificado de Aiven se configuran en el backend.
+
+## Pruebas
+
+El target `CruzContigoTests` incluye **9 pruebas unitarias con Swift Testing**. Cinco cubren modelos y validaciones de familiares, una cubre la validación del teléfono y tres cubren las consultas de Frida. Ejecútalas en Xcode con **Product → Test** o **⌘U**.
+
+Para una prueba manual, registra un familiar, agrega un medicamento y un recordatorio, vuelve a abrir sus pantallas para comprobar que se guardaron y consulta ambos desde Frida.
+
+## Estado actual
+
+Red de cuidado sigue pendiente como función de la app. Los familiares antiguos sin vínculo admiten recordatorios privados para la cuenta que los crea. Los avisos recurrentes y las alertas automáticas de resurtido quedan pendientes.
