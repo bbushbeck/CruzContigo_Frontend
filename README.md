@@ -23,6 +23,14 @@ Desde **Inicio**, abre **Habla con Frida**. Puedes escribir una consulta o dicta
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
 
+## Red de cuidado, contactos y diario
+
+- **Red de cuidado (HU-17, HU-26):** invita por teléfono o con un código de un solo uso (`cruzcontigo://invitacion/CODIGO`, registrado en `CruzContigo-Info.plist`) con rol administrador, cocuidador, solo lectura o temporal. El acceso temporal vence solo y no ve la ficha médica salvo que se permita.
+- **Contactos de emergencia (RF-15):** en orden de prioridad; salen en la ficha de emergencia sin conexión, en el QR y en el botón de Emergencia.
+- **Diario de cuidado (HU-13):** notas por tema con fecha y autor; solo el autor las edita.
+
+Requiere que el backend tenga aplicado `red-de-cuidado.sql`.
+
 ## Ejecutar el proyecto
 
 1. Usa macOS con Xcode y el SDK de iOS 27 para compilar la versión actual. El proyecto tiene iOS 26 como mínimo de ejecución. La lectura de recetas requiere iOS 27.
@@ -41,4 +49,4 @@ Para una prueba manual, registra un familiar, agrega un medicamento y un recorda
 
 ## Estado actual
 
-Red de cuidado sigue pendiente como función de la app. Los familiares antiguos sin vínculo admiten recordatorios privados para la cuenta que los crea. Los avisos recurrentes y las alertas automáticas de resurtido quedan pendientes.
+Los familiares antiguos sin vínculo admiten recordatorios privados para la cuenta que los crea. Los avisos recurrentes y las alertas automáticas de resurtido quedan pendientes.
