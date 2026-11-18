@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import SwiftUI
 
 @MainActor
 @Observable
@@ -24,9 +25,9 @@ final class ContactosEmergenciaViewModel {
     let familiarID: UUID
     private let repositorio: ContactosRepository
 
-    init(familiarID: UUID, repositorio: ContactosRepository = Repositorios.contactos()) {
+    init(familiarID: UUID, repositorio: ContactosRepository? = nil) {
         self.familiarID = familiarID
-        self.repositorio = repositorio
+        self.repositorio = repositorio ?? Repositorios.contactos()
     }
 
     var puedeAgregar: Bool { contactos.count < Self.maximo }
