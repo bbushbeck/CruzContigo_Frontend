@@ -24,6 +24,9 @@ struct MedicamentoExtraido {
     @Guide(description: "Frecuencia indicada, por ejemplo cada 8 horas")
     var frecuencia: String?
 
+    @Guide(description: "Duración del tratamiento en días, solo si está escrita explícitamente. Por ejemplo 'por 7 días' es 7 y 'por 2 semanas' es 14")
+    var duracionDias: Int?
+
     @Guide(description: "Indicación escrita explícitamente en la receta")
     var indicacion: String?
 }
@@ -35,13 +38,16 @@ struct RecetaExtraida {
     var medicamentos: [MedicamentoExtraido]
 }
 
-extension MedicationDraft {
-    mutating func aplicar(_ medicamento: MedicamentoExtraido) {
-        name = medicamento.nombre
-        dose = medicamento.dosis ?? ""
-        unit = medicamento.unidad ?? ""
-        presentation = medicamento.presentacion ?? ""
-        frequency = medicamento.frecuencia ?? ""
-        indication = medicamento.indicacion ?? ""
+extension MedicamentoExtraido {
+    var transcrito: MedicamentoTranscrito {
+        MedicamentoTranscrito(
+            nombre: nombre,
+            dosis: dosis,
+            unidad: unidad,
+            presentacion: presentacion,
+            frecuencia: frecuencia,
+            duracionDias: duracionDias,
+            indicacion: indicacion
+        )
     }
 }

@@ -12,12 +12,11 @@ struct MedicationFormView: View {
     @State private var draft: MedicationDraft
     @State private var isSaving = false
     @State private var saveError: String?
-    @State private var recetaSelection: PhotosPickerItem?
-    @State private var recetaExtraida: RecetaExtraida?
-    @State private var isReadingReceta = false
-    @State private var recetaError: String?
-    @State private var recetaAplicada = false
-    @State private var recetaGuardada = false
+    @StateObject private var receta = TranscripcionRecetaViewModel()
+    @State private var mostrandoOpcionesReceta = false
+    @State private var mostrandoFotos = false
+    @State private var fotoReceta: PhotosPickerItem?
+    @State private var fuenteCaptura: FuenteCapturaReceta?
 
     init(recipientID: UUID, model: MedicationViewModel, editing: Medication? = nil) {
         self.recipientID = recipientID
@@ -28,73 +27,7 @@ struct MedicationFormView: View {
 
     var body: some View {
         Form {
-            if #available(iOS 27.0, *) {
-                Section("Leer receta") {
-                    PhotosPicker(selection: $recetaSelection, matching: .images) {
-                        Label("Seleccionar foto de receta", systemImage: "doc.viewfinder")
-                    }
-                    .disabled(isReadingReceta || isSaving)
-
-                    if isReadingReceta {
-                        ProgressView("Leyendo receta...")
-                    }
-
-                    if recetaGuardada {
-                        Label("Foto guardada en Información médica › Documentos.", systemImage: "checkmark.circle.fill")
-                            .font(.app(.footnote))
-                            .foregroundStyle(Color.textoSuave)
-                    }
-
-                    if let recetaError {
-                        Text(recetaError)
-                            .font(.app(.footnote))
-                            .foregroundStyle(MedicalStyle.red)
-                    }
-
-                    if let recetaExtraida {
-                        if recetaExtraida.medicamentos.isEmpty {
-                            Text("No se detectaron medicamentos. Puedes capturarlos manualmente.")
-                        } else {
-                            Text("Se detectaron varios medicamentos. Elige cuál quieres aplicar al formulario.")
-                                .font(.app(.footnote))
-                                .foregroundStyle(Color.textoSuave)
-                            ForEach(recetaExtraida.medicamentos.indices, id: \.self) { index in
-                                let medicamento = recetaExtraida.medicamentos[index]
-                                let dosis = [medicamento.dosis, medicamento.unidad]
-                                    .compactMap { $0 }
-                                    .joined(separator: " ")
-                                Button {
-                                    aplicar(medicamento)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(medicamento.nombre)
-                                            .font(.app(.headline))
-                                            .foregroundStyle(.primary)
-                                        Text(dosis.isEmpty ? "Dosis no detectada" : dosis)
-                                            .foregroundStyle(Color.textoSuave)
-                                        Text("Usar este medicamento")
-                                            .font(.app(.footnote))
-                                            .foregroundStyle(MedicalStyle.red)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    if recetaAplicada {
-                        Label("Formulario actualizado. Revisa y completa los datos antes de guardar.",
-                              systemImage: "checkmark.circle.fill")
-                            .font(.app(.footnote))
-                            .foregroundStyle(Color.textoSuave)
-                    }
-                }
-                .onChange(of: recetaSelection) { _, item in
-                    guard let item else { return }
-                    Task { await leerReceta(item) }
-                }
-            }
+            seccionReceta
 
             Section("Medicamento") {
                 TextField("Nombre del medicamento", text: $draft.name)
@@ -133,7 +66,7 @@ struct MedicationFormView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancelar") { dismiss() }
-                    .disabled(isSaving || isReadingReceta)
+                    .disabled(isSaving || receta.leyendo)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar") {
@@ -149,10 +82,35 @@ struct MedicationFormView: View {
                         }
                     }
                 }
-                .disabled(!draft.isValid || isSaving || isReadingReceta)
+                .disabled(!draft.isValid || isSaving || receta.leyendo)
             }
         }
-        .interactiveDismissDisabled(isSaving || isReadingReceta)
+        .interactiveDismissDisabled(isSaving || receta.leyendo)
+        .confirmationDialog("Transcribir receta", isPresented: $mostrandoOpcionesReceta, titleVisibility: .visible) {
+            if FuenteCapturaReceta.escaner.disponible {
+                Button("Escanear receta") { fuenteCaptura = .escaner }
+            }
+            if FuenteCapturaReceta.camara.disponible {
+                Button("Tomar foto") { fuenteCaptura = .camara }
+            }
+            Button("Elegir de Fotos") { mostrandoFotos = true }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Se leerán los medicamentos de la receta para llenar el formulario.")
+        }
+        .photosPicker(isPresented: $mostrandoFotos, selection: $fotoReceta, matching: .images)
+        .onChange(of: fotoReceta) { _, item in
+            guard let item else { return }
+            fotoReceta = nil
+            Task { await leerFoto(item) }
+        }
+        .fullScreenCover(item: $fuenteCaptura) { fuente in
+            CapturaRecetaView(fuente: fuente) { imagen in
+                fuenteCaptura = nil
+                if let imagen { Task { await transcribir(imagen) } }
+            }
+            .ignoresSafeArea()
+        }
         .alert("No se pudo guardar", isPresented: Binding(
             get: { saveError != nil },
             set: { if !$0 { saveError = nil } }
@@ -162,48 +120,107 @@ struct MedicationFormView: View {
         .tint(MedicalStyle.red)
     }
 
-    @available(iOS 27.0, *)
-    private func leerReceta(_ item: PhotosPickerItem) async {
-        isReadingReceta = true
-        recetaError = nil
-        recetaExtraida = nil
-        recetaAplicada = false
-        recetaGuardada = false
-        defer {
-            isReadingReceta = false
-            recetaSelection = nil
-        }
+    // MARK: - Receta
 
-        do {
-            guard let data = try await item.loadTransferable(type: Data.self),
-                  let imagen = UIImage(data: data) else {
-                throw RecetaExtractorError.imagenInvalida
+    private var seccionReceta: some View {
+        Section {
+            Button {
+                mostrandoOpcionesReceta = true
+            } label: {
+                Label("Transcribir receta", systemImage: "doc.text.viewfinder")
+                    .font(.app(.headline))
             }
-            guard let archivo = imagen.jpegData(compressionQuality: 0.9) else {
-                throw RecetaExtractorError.imagenInvalida
+            .disabled(receta.leyendo || isSaving)
+            .accessibilityIdentifier("transcribirRecetaButton")
+            .accessibilityHint("Escanea, toma una foto o elige una imagen de la receta para llenar el formulario")
+
+            if receta.leyendo {
+                ProgressView("Leyendo receta...")
             }
-            try DocumentosMedicosRepository.guardar(
-                archivo,
-                titulo: "Receta médica",
-                extensionArchivo: "jpg",
-                tipo: .receta,
-                familiarID: recipientID
-            )
-            recetaGuardada = true
-            let receta = try await RecetaExtractor().extraer(desde: imagen)
-            if receta.medicamentos.count == 1, let medicamento = receta.medicamentos.first {
-                aplicar(medicamento)
-            } else {
-                recetaExtraida = receta
+
+            if receta.guardadaEnDocumentos {
+                Label("Foto guardada en Información médica › Documentos.", systemImage: "checkmark.circle.fill")
+                    .font(.app(.footnote))
+                    .foregroundStyle(Color.textoSuave)
             }
-        } catch {
-            recetaError = "No se pudo leer la receta: \(error.localizedDescription)"
+
+            if let error = receta.error {
+                Text(error)
+                    .font(.app(.footnote))
+                    .foregroundStyle(MedicalStyle.red)
+            }
+
+            if receta.sinMedicamentos {
+                Text("No se detectaron medicamentos. Puedes capturarlos manualmente.")
+                    .font(.app(.footnote))
+            }
+
+            if !receta.candidatos.isEmpty {
+                Text("Se detectaron varios medicamentos. Elige cuál quieres aplicar al formulario.")
+                    .font(.app(.footnote))
+                    .foregroundStyle(Color.textoSuave)
+                ForEach(receta.candidatos.indices, id: \.self) { index in
+                    candidato(receta.candidatos[index])
+                }
+            }
+
+            if receta.aplicada {
+                Label(mensajeAplicada, systemImage: "checkmark.circle.fill")
+                    .font(.app(.footnote))
+                    .foregroundStyle(Color.textoSuave)
+            }
+        } header: {
+            Text("Receta médica")
+        } footer: {
+            Text("La receta se transcribe en el dispositivo. Revisa cada dato contra la receta antes de guardar.")
         }
     }
 
-    private func aplicar(_ medicamento: MedicamentoExtraido) {
-        draft.aplicar(medicamento)
-        recetaExtraida = nil
-        recetaAplicada = true
+    private var mensajeAplicada: String {
+        switch receta.metodo {
+        case .reconocimientoTexto:
+            "Formulario actualizado con el texto reconocido. Verifica cada dato con la receta y completa lo que falte."
+        default:
+            "Formulario actualizado. Revisa y completa los datos antes de guardar."
+        }
+    }
+
+    private func candidato(_ medicamento: MedicamentoTranscrito) -> some View {
+        let dosis = [medicamento.dosis, medicamento.unidad].compactMap { $0 }.joined(separator: " ")
+        return Button {
+            draft.aplicar(receta.elegir(medicamento))
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(medicamento.nombre)
+                    .font(.app(.headline))
+                    .foregroundStyle(.primary)
+                Text(dosis.isEmpty ? "Dosis no detectada" : dosis)
+                    .foregroundStyle(Color.textoSuave)
+                if let frecuencia = medicamento.frecuencia {
+                    Text(frecuencia)
+                        .foregroundStyle(Color.textoSuave)
+                }
+                Text("Usar este medicamento")
+                    .font(.app(.footnote))
+                    .foregroundStyle(MedicalStyle.red)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func leerFoto(_ item: PhotosPickerItem) async {
+        guard let datos = try? await item.loadTransferable(type: Data.self),
+              let imagen = UIImage(data: datos) else {
+            receta.reportar(RecetaExtractorError.imagenInvalida.localizedDescription)
+            return
+        }
+        await transcribir(imagen)
+    }
+
+    private func transcribir(_ imagen: UIImage) async {
+        if let medicamento = await receta.transcribir(imagen, familiarID: recipientID) {
+            draft.aplicar(medicamento)
+        }
     }
 }
