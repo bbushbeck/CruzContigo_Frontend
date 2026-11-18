@@ -18,6 +18,7 @@ struct FichaEmergenciaView: View {
     @State private var llamada: ContactoEmergencia?
     @State private var mostrandoQR = false
     @State private var pidiendoConsentimiento = false
+    @State private var editandoContactos = false
 
     init(familiarID: UUID) {
         self.familiarID = familiarID
@@ -181,6 +182,12 @@ struct FichaEmergenciaView: View {
                         .buttonStyle(.plain)
                         .accessibilityHint("Pide confirmación antes de llamar")
                     }
+                    if let familiar, familiar.puedeEditar, !familiar.esProfesional, !viewModel.sinConexion {
+                        Button("Cambiar contactos de emergencia") { editandoContactos = true }
+                            .font(.app(.subheadline).weight(.bold))
+                            .foregroundColor(.brandRed)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
                 }
 
                 seccionQR(ficha)
@@ -190,6 +197,13 @@ struct FichaEmergenciaView: View {
             .padding(.bottom, 32)
         }
         .refreshable { await viewModel.cargar(familiar: familiar) }
+        .sheet(isPresented: $editandoContactos, onDismiss: {
+            Task { await viewModel.cargar(familiar: familiar) }
+        }) {
+            if let familiar {
+                ContactosEmergenciaView(familiarID: familiar.id, nombre: familiar.nombre, puedeEditar: familiar.puedeEditar)
+            }
+        }
     }
 
     @ViewBuilder

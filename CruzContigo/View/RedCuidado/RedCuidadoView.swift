@@ -106,6 +106,11 @@ struct RedCuidadoView: View {
                 AccesosFichaView(familiarID: persona.id, nombre: persona.nombre)
             }
         }
+        .sheet(isPresented: $viendoContactos) {
+            if let persona = seleccionada {
+                ContactosEmergenciaView(familiarID: persona.id, nombre: persona.nombre, puedeEditar: persona.puedeEditar)
+            }
+        }
         .confirmationDialog(
             "¿Cancelar la invitación?",
             isPresented: Binding(get: { porCancelar != nil }, set: { if !$0 { porCancelar = nil } }),
@@ -215,6 +220,14 @@ struct RedCuidadoView: View {
                             FilaIntegrante(miembro: miembro)
                         }
                     } esVacio: { red.miembros.isEmpty }
+
+                    Button { viendoContactos = true } label: {
+                        Label("Contactos de emergencia", systemImage: "phone.badge.waveform.fill")
+                            .font(.app(.headline))
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
+                    }
+                    .accessibilityHint("A quién llamar si a \(persona.nombre) le pasa algo")
 
                     if red.puedeInvitar {
                         if !red.invitaciones.isEmpty {

@@ -22,6 +22,11 @@ struct EmergenciaSheet: View {
         let numero: String
     }
 
+    private var contactosDePersona: [ContactoEmergencia] {
+        guard let persona, !persona.esProfesional else { return [] }
+        return Array((FichasEmergenciaGuardadas.obtener(persona.id)?.contactos ?? []).filter { !$0.esPropio }.prefix(3))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -78,6 +83,17 @@ struct EmergenciaSheet: View {
                         subtitulo: formatear(telefono)
                     ) {
                         llamadaPendiente = Llamada(pregunta: "¿Llamar a \(persona.nombre)?", numero: telefono)
+                    }
+                }
+
+                // RF-15: sus contactos de emergencia, desde la copia guardada (abre sin conexión).
+                ForEach(contactosDePersona) { contacto in
+                    opcion(
+                        icono: "person.crop.circle.badge.exclamationmark",
+                        titulo: "Llamar a \(contacto.nombre)",
+                        subtitulo: contacto.detalle + " · " + formatear(contacto.telefono)
+                    ) {
+                        llamadaPendiente = Llamada(pregunta: "¿Llamar a \(contacto.nombre)?", numero: contacto.telefono)
                     }
                 }
 

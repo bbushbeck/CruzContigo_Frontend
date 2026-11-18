@@ -25,6 +25,9 @@ struct ContactoEmergencia: Codable, Hashable, Identifiable {
     let telefono: String
 
     var id: String { "\(nombre)|\(telefono)" }
+
+    static let detallePropio = "Su teléfono"
+    var esPropio: Bool { detalle == Self.detallePropio }
 }
 
 struct FichaEmergencia: Codable, Hashable, Identifiable {
@@ -36,7 +39,8 @@ struct FichaEmergencia: Codable, Hashable, Identifiable {
     let enfermedades: [Enfermedad]
     let observaciones: String?
     let medicamentos: [MedicamentoEmergencia]
-    let contactos: [ContactoEmergencia]
+    /// Primero los contactos de emergencia en su orden (RF-15) y al final su propio teléfono.
+    var contactos: [ContactoEmergencia]
     /// Copia del consentimiento de la persona titular al momento de sincronizar.
     let qrConsentido: Bool
     let actualizada: Date
@@ -48,12 +52,11 @@ struct FichaEmergencia: Codable, Hashable, Identifiable {
         ficha: FichaMedica?,
         medicamentos: [Medication],
         qrConsentido: Bool,
+        contactos registrados: [ContactoRegistrado] = [],
         fecha: Date = Date()
     ) -> FichaEmergencia {
-        var contactos: [ContactoEmergencia] = []
-        if let telefono = familiar.telefono, !telefono.isEmpty {
-            contactos.append(ContactoEmergencia(nombre: familiar.nombre, detalle: "Su teléfono", telefono: telefono))
-        }
+        let propio = familiar.telefono.flatMap { $0.isEmpty ? nil : ContactoEmergencia(nombre: familiar.nombre, detalle: ContactoEmergencia.detallePropio, telefono: $0) }
+        let contactos = Self.contactos(de: registrados, propio: propio)
         return FichaEmergencia(
             familiarID: familiar.id,
             nombre: familiar.nombreCompleto,
@@ -69,6 +72,13 @@ struct FichaEmergencia: Codable, Hashable, Identifiable {
             qrConsentido: qrConsentido,
             actualizada: fecha
         )
+    }
+
+    static func contactos(de registrados: [ContactoRegistrado], propio: ContactoEmergencia?) -> [ContactoEmergencia] {
+        let ordenados = registrados.sorted { $0.prioridad < $1.prioridad }.map {
+            ContactoEmergencia(nombre: $0.nombre, detalle: $0.parentesco ?? "Contacto \($0.prioridad)", telefono: $0.telefono)
+        }
+        return ordenados + (propio.map { [$0] } ?? [])
     }
 
     /// Texto plano para el QR: se lee con la cámara de cualquier teléfono, sin la app
