@@ -70,7 +70,7 @@ enum Modulo: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    static let disponibles: Set<Modulo> = [.fichaMedica, .medicamentos, .recordatorios, .citas, .accesibilidad]
+    static let disponibles: Set<Modulo> = [.fichaMedica, .medicamentos, .recordatorios, .citas, .emergencia, .accesibilidad]
 
     var disponible: Bool { Self.disponibles.contains(self) }
 

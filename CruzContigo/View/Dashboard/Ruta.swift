@@ -59,6 +59,13 @@ struct ModuloDestino: View {
                 service: MedicationServices.live()
             )
 
+        case .emergencia:
+            if let familiarID {
+                FichaEmergenciaView(familiarID: familiarID)
+            } else {
+                ModuloPendienteView(modulo: modulo, familiarID: nil)
+            }
+
         case .citas, .recordatorios:
             RecordatoriosView(familiarID: familiarID)
 

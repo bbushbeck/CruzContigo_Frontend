@@ -67,6 +67,12 @@ struct DashboardView: View {
         .task {
             if store.estado == .inicial { await store.cargar() }
         }
+        .task(id: store.estado) {
+            // HU-19: deja lista la ficha de emergencia de cada familiar para usarla sin red.
+            if store.estado == .listo {
+                await SincronizadorFichaEmergencia().sincronizarTodas(store.familiares)
+            }
+        }
         .sheet(isPresented: $mostrarFrida, onDismiss: navegarDesdeFrida) {
             FridaView(familiarSeleccionado: seleccionada?.id) { destino in
                 destinoFrida = destino

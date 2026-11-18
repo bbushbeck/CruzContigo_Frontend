@@ -58,7 +58,12 @@ struct FichaMedicaView: View {
         .task { await viewModel.cargar() }
         .sheet(isPresented: $editando) {
             EditFichaMedicaView(ficha: viewModel.borrador, nombre: familiar?.nombre ?? "") { nueva in
-                await viewModel.guardar(nueva)
+                let error = await viewModel.guardar(nueva)
+                if error == nil, let familiar, !familiar.esProfesional {
+                    // La copia sin conexión (HU-19) refleja el cambio de inmediato.
+                    _ = try? await SincronizadorFichaEmergencia().sincronizar(familiar)
+                }
+                return error
             }
         }
         .sheet(isPresented: $mostrandoDocumentos) {

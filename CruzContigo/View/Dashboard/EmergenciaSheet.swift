@@ -12,6 +12,9 @@ struct EmergenciaSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var llamadaPendiente: Llamada?
+    /// Copias guardadas para cuando la lista de familiares no cargó (por ejemplo, sin red).
+    @State private var guardadas: [FichaEmergencia] = []
+    @State private var fichaGuardada: FichaEmergencia?
 
     struct Llamada: Identifiable {
         let id = UUID()
@@ -78,12 +81,24 @@ struct EmergenciaSheet: View {
                     }
                 }
 
-                opcion(
-                    icono: Modulo.emergencia.icono,
-                    titulo: persona.map { "Ficha de emergencia de \($0.nombre)" } ?? "Ficha de emergencia",
-                    subtitulo: "Alergias, tipo de sangre y contactos para mostrar a paramédicos"
-                ) {
-                    abrirModulo(.emergencia)
+                if persona == nil, !guardadas.isEmpty {
+                    ForEach(guardadas) { ficha in
+                        opcion(
+                            icono: Modulo.emergencia.icono,
+                            titulo: "Ficha de emergencia de \(ficha.nombre)",
+                            subtitulo: "Guardada en este teléfono. Abre sin conexión."
+                        ) {
+                            fichaGuardada = ficha
+                        }
+                    }
+                } else if persona?.esProfesional != true {
+                    opcion(
+                        icono: Modulo.emergencia.icono,
+                        titulo: persona.map { "Ficha de emergencia de \($0.nombre)" } ?? "Ficha de emergencia",
+                        subtitulo: "Alergias, tipo de sangre, medicamentos y contactos. Abre sin conexión."
+                    ) {
+                        abrirModulo(.emergencia)
+                    }
                 }
 
                 Label {
@@ -95,6 +110,10 @@ struct EmergenciaSheet: View {
                 .foregroundColor(.textoSuave)
             }
             .padding(24)
+        }
+        .onAppear { guardadas = FichasEmergenciaGuardadas.todas() }
+        .fullScreenCover(item: $fichaGuardada) { ficha in
+            FichaEmergenciaView(familiarID: ficha.familiarID)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
