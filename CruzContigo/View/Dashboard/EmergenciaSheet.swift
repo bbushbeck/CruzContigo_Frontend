@@ -23,7 +23,7 @@ struct EmergenciaSheet: View {
     }
 
     private var contactosDePersona: [ContactoEmergencia] {
-        guard let persona, !persona.esProfesional else { return [] }
+        guard let persona, persona.modulosVisibles.contains(.emergencia) else { return [] }
         return Array((FichasEmergenciaGuardadas.obtener(persona.id)?.contactos ?? []).filter { !$0.esPropio }.prefix(3))
     }
 
@@ -107,7 +107,7 @@ struct EmergenciaSheet: View {
                             fichaGuardada = ficha
                         }
                     }
-                } else if persona?.esProfesional != true {
+                } else if persona.map({ $0.modulosVisibles.contains(.emergencia) }) ?? true {
                     opcion(
                         icono: Modulo.emergencia.icono,
                         titulo: persona.map { "Ficha de emergencia de \($0.nombre)" } ?? "Ficha de emergencia",

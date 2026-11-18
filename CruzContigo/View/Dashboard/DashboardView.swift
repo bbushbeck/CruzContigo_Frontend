@@ -297,7 +297,7 @@ struct DashboardView: View {
             }
             if (tipo.isAccessibilitySize || preferencias.lecturaFacil) {
                 VStack(spacing: 10) {
-                    ForEach(Modulo.accesosRapidos) { modulo in
+                    ForEach(Modulo.accesosRapidos.filter(persona.modulosVisibles.contains)) { modulo in
                         NavigationLink(value: Ruta.modulo(modulo, familiarID: persona.id)) {
                             AccesoRapidoTile(modulo: modulo, compacto: false)
                         }
@@ -306,7 +306,7 @@ struct DashboardView: View {
                 }
             } else {
                 HStack(spacing: 10) {
-                    ForEach(Modulo.accesosRapidos) { modulo in
+                    ForEach(Modulo.accesosRapidos.filter(persona.modulosVisibles.contains)) { modulo in
                         NavigationLink(value: Ruta.modulo(modulo, familiarID: persona.id)) {
                             AccesoRapidoTile(modulo: modulo)
                         }

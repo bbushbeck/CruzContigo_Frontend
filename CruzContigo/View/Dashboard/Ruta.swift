@@ -69,6 +69,13 @@ struct ModuloDestino: View {
         case .redCuidado:
             RedCuidadoView(familiarID: familiarID)
 
+        case .diario:
+            if let familiarID {
+                DiarioView(familiarID: familiarID)
+            } else {
+                ModuloPendienteView(modulo: modulo, familiarID: nil)
+            }
+
         case .citas, .recordatorios:
             RecordatoriosView(familiarID: familiarID)
 
