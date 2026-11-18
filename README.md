@@ -48,6 +48,7 @@ enviarla. El dictado requiere permiso de micrófono y reconocimiento de voz, y u
 dispositivo con reconocimiento en español disponible sin conexión.
 
 Frida consulta la API configurada en `CRUZ_API_URL`. Los cambios se guardan desde
-las pantallas de Medicamentos y Recordatorios. La API debe tener instalada la
-tabla `recordatorio_usuario` para utilizar Recordatorios. Las notificaciones
-se programan localmente en el dispositivo donde se guarda el recordatorio.
+las pantallas de Medicamentos y Recordatorios. La API usa la tabla existente
+`recordatorio` y conserva el acceso del familiar en su red de cuidado. Los
+familiares registrados con una sesión iniciada quedan vinculados a tu cuenta.
+Los avisos se programan en el dispositivo donde se guarda el recordatorio.

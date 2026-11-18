@@ -19,7 +19,9 @@ struct RemoteFamiliarRepository: FamiliarRepository {
     }
 
     func crear(_ familiar: Familiar) async throws -> Familiar {
-        try await api.post("familiares", cuerpo: familiar)
+        var cliente = api
+        cliente.token = api.token ?? AuthTokenStore.shared.cargar()
+        return try await cliente.post("familiares", cuerpo: familiar)
     }
 
     func eliminar(id: UUID) async throws {
