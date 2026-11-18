@@ -41,6 +41,13 @@ struct AccesibilidadView: View {
 
                     Seccion(titulo: "Lectura") {
                         FilaInterruptor(
+                            icono: "rectangle.expand.vertical",
+                            titulo: "Vista simplificada",
+                            detalle: "Muestra solo las acciones esenciales y usa listas verticales.",
+                            valor: $prefs.lecturaFacil
+                        )
+                        Divider().padding(.leading, 60)
+                        FilaInterruptor(
                             icono: "textformat",
                             titulo: "Letra para dislexia",
                             detalle: "Usa la tipografía OpenDyslexic, con letras de base más pesada que evitan confusiones como b/d o p/q.",

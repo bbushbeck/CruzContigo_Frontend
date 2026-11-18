@@ -7,30 +7,13 @@ import SwiftUI
 
 struct EditFichaMedicaView: View {
     let nombre: String
-    let onGuardar: (FichaMedica) async -> String?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var ficha: FichaMedica
-    @State private var observaciones: String
-    @State private var nuevaAlergia = ""
-    @State private var nuevaSeveridad: Severidad? = .leve
-    @State private var nuevaEnfermedad = ""
-    @State private var intentoGuardar = false
-    @State private var guardando = false
-    @State private var errorGuardado: String?
+    @State private var viewModel: EditFichaMedicaViewModel
 
     init(ficha: FichaMedica, nombre: String, onGuardar: @escaping (FichaMedica) async -> String?) {
         self.nombre = nombre
-        self.onGuardar = onGuardar
-        _ficha = State(initialValue: ficha)
-        _observaciones = State(initialValue: ficha.observaciones ?? "")
-    }
-
-    private var fichaFinal: FichaMedica {
-        var f = ficha
-        let obs = observaciones.trimmingCharacters(in: .whitespacesAndNewlines)
-        f.observaciones = obs.isEmpty ? nil : obs
-        return f
+        _viewModel = State(initialValue: EditFichaMedicaViewModel(ficha: ficha, onGuardar: onGuardar))
     }
 
     var body: some View {
@@ -50,7 +33,7 @@ struct EditFichaMedicaView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(nombre.isEmpty ? "Datos médicos" : "Datos médicos de \(nombre)")
-                            .font(.system(size: 26, weight: .bold))
+                            .font(.app(.title).weight(.bold))
                         Text("Usa datos ficticios durante las pruebas.")
                             .font(.app(.footnote))
                             .foregroundColor(.textoSuave)
@@ -59,11 +42,11 @@ struct EditFichaMedicaView: View {
                     FormFieldContainer(
                         titulo: "Tipo sanguíneo",
                         obligatorio: true,
-                        error: intentoGuardar && ficha.tipoSanguineo == nil ? "Selecciona una opción." : nil
+                        error: viewModel.intentoGuardar && viewModel.ficha.tipoSanguineo == nil ? "Selecciona una opción." : nil
                     ) {
                         ChipSelector(
                             opciones: TipoSanguineo.allCases,
-                            seleccion: $ficha.tipoSanguineo,
+                            seleccion: $viewModel.ficha.tipoSanguineo,
                             titulo: \.titulo
                         )
                     }
@@ -71,8 +54,27 @@ struct EditFichaMedicaView: View {
                     seccionAlergias
                     seccionEnfermedades
 
+                    FormFieldContainer(titulo: "Antecedentes (opcional)") {
+                        TextField("Antecedentes familiares o médicos", text: $viewModel.antecedentes, axis: .vertical)
+                            .lineLimit(3...6)
+                            .padding(16)
+                            .fieldBorder(false)
+                    }
+
+                    FormFieldContainer(titulo: "Médico tratante (opcional)") {
+                        TextField("Nombre del médico", text: $viewModel.medicoTratante)
+                            .padding(16)
+                            .fieldBorder(false)
+                    }
+
+                    FormFieldContainer(titulo: "Institución de salud (opcional)") {
+                        TextField("Ej. IMSS, ISSSTE", text: $viewModel.institucionSalud)
+                            .padding(16)
+                            .fieldBorder(false)
+                    }
+
                     FormFieldContainer(titulo: "Observaciones (opcional)") {
-                        TextField("Ej. Marcapasos, usa lentes, dieta baja en sodio", text: $observaciones, axis: .vertical)
+                        TextField("Ej. Marcapasos, usa lentes, dieta baja en sodio", text: $viewModel.observaciones, axis: .vertical)
                             .lineLimit(3...6)
                             .padding(16)
                             .fieldBorder(false)
@@ -84,29 +86,33 @@ struct EditFichaMedicaView: View {
             .scrollDismissesKeyboard(.interactively)
 
             VStack(spacing: 10) {
-                if intentoGuardar, let primerError = fichaFinal.errores.first {
+                if viewModel.intentoGuardar, let primerError = viewModel.fichaFinal.errores.first {
                     Text(primerError)
                         .font(.app(.footnote))
                         .foregroundColor(.brandRed)
                 }
-                PrimaryButton(title: guardando ? "Guardando…" : "Guardar ficha") {
-                    Task { await guardar() }
+                PrimaryButton(title: viewModel.guardando ? "Guardando…" : "Guardar ficha") {
+                    Task {
+                        if await viewModel.guardar() {
+                            dismiss()
+                        }
+                    }
                 }
-                .disabled(guardando)
-                .opacity(guardando ? 0.7 : 1)
+                .disabled(viewModel.guardando)
+                .opacity(viewModel.guardando ? 0.7 : 1)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
         .tint(.brandRed)
-        .interactiveDismissDisabled(guardando)
+        .interactiveDismissDisabled(viewModel.guardando)
         .alert("No se pudo guardar", isPresented: Binding(
-            get: { errorGuardado != nil },
-            set: { if !$0 { errorGuardado = nil } }
+            get: { viewModel.errorGuardado != nil },
+            set: { if !$0 { viewModel.errorGuardado = nil } }
         )) {
             Button("Aceptar", role: .cancel) {}
         } message: {
-            Text(errorGuardado ?? "")
+            Text(viewModel.errorGuardado ?? "")
         }
     }
 
@@ -114,80 +120,48 @@ struct EditFichaMedicaView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Alergias").font(.app(.title3)).fontWeight(.bold)
 
-            ForEach(ficha.alergias) { alergia in
+            ForEach(viewModel.ficha.alergias) { alergia in
                 FilaEditable(texto: alergia.nombre) {
                     SeveridadChip(severidad: alergia.severidad)
                 } eliminar: {
-                    ficha.alergias.removeAll { $0.id == alergia.id }
+                    viewModel.eliminarAlergia(alergia)
                 }
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    TextField("Ej. Penicilina", text: $nuevaAlergia)
+                    TextField("Ej. Penicilina", text: $viewModel.nuevaAlergia)
                         .padding(.horizontal, 14)
                         .frame(height: 48)
                         .fieldBorder(false)
-                        .onSubmit(agregarAlergia)
-                    BotonAgregar(habilitado: !limpio(nuevaAlergia).isEmpty, accion: agregarAlergia)
+                        .onSubmit(viewModel.agregarAlergia)
+                    BotonAgregar(habilitado: viewModel.puedeAgregarAlergia, accion: viewModel.agregarAlergia)
                 }
-                ChipSelector(opciones: Severidad.allCases, seleccion: $nuevaSeveridad, titulo: \.titulo)
+                ChipSelector(opciones: Severidad.allCases, seleccion: $viewModel.nuevaSeveridad, titulo: \.titulo)
             }
         }
-    }
-
-    private func agregarAlergia() {
-        let nombre = limpio(nuevaAlergia)
-        guard !nombre.isEmpty else { return }
-        ficha.alergias.append(Alergia(nombre: nombre, severidad: nuevaSeveridad ?? .leve))
-        nuevaAlergia = ""
     }
 
     private var seccionEnfermedades: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Enfermedades").font(.app(.title3)).fontWeight(.bold)
 
-            ForEach(ficha.enfermedades) { enfermedad in
+            ForEach(viewModel.ficha.enfermedades) { enfermedad in
                 FilaEditable(texto: enfermedad.nombre) {
                     EmptyView()
                 } eliminar: {
-                    ficha.enfermedades.removeAll { $0.id == enfermedad.id }
+                    viewModel.eliminarEnfermedad(enfermedad)
                 }
             }
 
             HStack(spacing: 8) {
-                TextField("Ej. Diabetes tipo 2", text: $nuevaEnfermedad)
+                TextField("Ej. Diabetes tipo 2", text: $viewModel.nuevaEnfermedad)
                     .padding(.horizontal, 14)
                     .frame(height: 48)
                     .fieldBorder(false)
-                    .onSubmit(agregarEnfermedad)
-                BotonAgregar(habilitado: !limpio(nuevaEnfermedad).isEmpty, accion: agregarEnfermedad)
+                    .onSubmit(viewModel.agregarEnfermedad)
+                BotonAgregar(habilitado: viewModel.puedeAgregarEnfermedad, accion: viewModel.agregarEnfermedad)
             }
-        }
-    }
-
-    private func agregarEnfermedad() {
-        let nombre = limpio(nuevaEnfermedad)
-        guard !nombre.isEmpty else { return }
-        ficha.enfermedades.append(Enfermedad(nombre: nombre))
-        nuevaEnfermedad = ""
-    }
-
-    private func limpio(_ s: String) -> String {
-        s.trimmingCharacters(in: .whitespaces)
-    }
-
-    private func guardar() async {
-        intentoGuardar = true
-        agregarAlergia()
-        agregarEnfermedad()
-        guard fichaFinal.esValida else { return }
-        guardando = true
-        defer { guardando = false }
-        if let error = await onGuardar(fichaFinal) {
-            errorGuardado = error
-        } else {
-            dismiss()
         }
     }
 }

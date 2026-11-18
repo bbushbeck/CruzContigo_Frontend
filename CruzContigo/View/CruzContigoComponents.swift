@@ -74,6 +74,7 @@ struct BrandBackButton: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
+        .accessibilityLabel("Regresar")
     }
 }
 
@@ -89,7 +90,7 @@ struct PrimaryButton: View {
                 .font(.app(.headline))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 56)
+                .frame(minHeight: 56)
                 .background(Color.rojoSolido)
                 .cornerRadius(16)
         }

@@ -17,6 +17,7 @@ struct MedicationFormView: View {
     @State private var isReadingReceta = false
     @State private var recetaError: String?
     @State private var recetaAplicada = false
+    @State private var recetaGuardada = false
 
     init(recipientID: UUID, model: MedicationViewModel, editing: Medication? = nil) {
         self.recipientID = recipientID
@@ -36,6 +37,12 @@ struct MedicationFormView: View {
 
                     if isReadingReceta {
                         ProgressView("Leyendo receta...")
+                    }
+
+                    if recetaGuardada {
+                        Label("Foto guardada en Información médica › Documentos.", systemImage: "checkmark.circle.fill")
+                            .font(.app(.footnote))
+                            .foregroundStyle(Color.textoSuave)
                     }
 
                     if let recetaError {
@@ -161,6 +168,7 @@ struct MedicationFormView: View {
         recetaError = nil
         recetaExtraida = nil
         recetaAplicada = false
+        recetaGuardada = false
         defer {
             isReadingReceta = false
             recetaSelection = nil
@@ -171,6 +179,17 @@ struct MedicationFormView: View {
                   let imagen = UIImage(data: data) else {
                 throw RecetaExtractorError.imagenInvalida
             }
+            guard let archivo = imagen.jpegData(compressionQuality: 0.9) else {
+                throw RecetaExtractorError.imagenInvalida
+            }
+            try DocumentosMedicosRepository.guardar(
+                archivo,
+                titulo: "Receta médica",
+                extensionArchivo: "jpg",
+                tipo: .receta,
+                familiarID: recipientID
+            )
+            recetaGuardada = true
             let receta = try await RecetaExtractor().extraer(desde: imagen)
             if receta.medicamentos.count == 1, let medicamento = receta.medicamentos.first {
                 aplicar(medicamento)

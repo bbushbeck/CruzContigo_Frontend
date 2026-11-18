@@ -75,8 +75,13 @@ struct Familiar: Codable, Identifiable, Hashable {
     var telefono: String?
     var notas: String?
     var fechaRegistro: Date = Date()
+    var rol: String? = nil
 
     var nombreCompleto: String { "\(nombre) \(apellidos)" }
+    var puedeEditar: Bool {
+        guard let rol else { return true }
+        return ["titular", "administrador", "cocuidador"].contains(rol)
+    }
 
     var iniciales: String {
         let n = nombre.first.map(String.init) ?? ""

@@ -12,6 +12,7 @@ struct FichaMedicaView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: FichaMedicaViewModel
     @State private var editando = false
+    @State private var mostrandoDocumentos = false
 
     init(familiarID: UUID) {
         self.familiarID = familiarID
@@ -53,13 +54,16 @@ struct FichaMedicaView: View {
                 await viewModel.guardar(nueva)
             }
         }
+        .sheet(isPresented: $mostrandoDocumentos) {
+            DocumentosMedicosView(familiarID: familiarID, puedeEditar: familiar?.puedeEditar ?? false)
+        }
     }
 
     private var header: some View {
         HStack {
             BrandBackButton { dismiss() }
             Spacer()
-            if viewModel.estado == .lista {
+            if viewModel.estado == .lista, familiar?.puedeEditar == true {
                 Button {
                     editando = true
                 } label: {
@@ -82,7 +86,7 @@ struct FichaMedicaView: View {
                 .fontWeight(.bold)
                 .foregroundColor(.brandRed)
             Text(familiar?.nombreCompleto ?? "Familiar")
-                .font(.system(size: 28, weight: .bold))
+                .font(.app(.title).weight(.bold))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -111,9 +115,16 @@ struct FichaMedicaView: View {
             }
             .padding(.horizontal, 32)
             Spacer()
-            PrimaryButton(title: "Crear ficha médica") { editando = true }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 32)
+            VStack(spacing: 8) {
+                if familiar?.puedeEditar == true {
+                    PrimaryButton(title: "Crear ficha médica") { editando = true }
+                }
+                Button("Ver documentos médicos") { mostrandoDocumentos = true }
+                    .font(.app(.headline))
+                    .frame(minHeight: 44)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
         }
     }
 
@@ -147,11 +158,38 @@ struct FichaMedicaView: View {
                     }
                 } esVacio: { ficha.enfermedades.isEmpty }
 
+                if let antecedentes = ficha.antecedentes {
+                    SeccionFicha(titulo: "Antecedentes", icono: "clock.arrow.circlepath", vacio: "") {
+                        Text(antecedentes).font(.app(.body))
+                    } esVacio: { false }
+                }
+
+                if ficha.medicoTratante != nil || ficha.institucionSalud != nil {
+                    SeccionFicha(titulo: "Atención médica", icono: "stethoscope", vacio: "") {
+                        if let medico = ficha.medicoTratante {
+                            Text("Médico tratante").font(.app(.caption)).foregroundColor(.textoSuave)
+                            Text(medico).font(.app(.body)).padding(.bottom, 6)
+                        }
+                        if let institucion = ficha.institucionSalud {
+                            Text("Institución de salud").font(.app(.caption)).foregroundColor(.textoSuave)
+                            Text(institucion).font(.app(.body))
+                        }
+                    } esVacio: { false }
+                }
+
                 if let observaciones = ficha.observaciones {
                     SeccionFicha(titulo: "Observaciones", icono: "note.text", vacio: "") {
                         Text(observaciones).font(.app(.body))
                     } esVacio: { false }
                 }
+
+                Button { mostrandoDocumentos = true } label: {
+                    Label("Documentos médicos", systemImage: "folder.fill")
+                        .font(.app(.headline))
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
+                }
+                .accessibilityHint("Abre las fotos de recetas, estudios y archivos PDF")
 
                 Text("Actualizada el \(ficha.ultimaActualizacion.formatted(date: .long, time: .shortened))")
                     .font(.app(.footnote))

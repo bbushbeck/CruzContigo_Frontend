@@ -52,6 +52,7 @@ final class Preferencias {
         static let movimiento = "pref.reducirMovimiento"
         static let vibraciones = "pref.vibraciones"
         static let negritas = "pref.negritas"
+        static let lecturaFacil = "pref.lecturaFacil"
     }
 
     private let defaults: UserDefaults
@@ -64,6 +65,7 @@ final class Preferencias {
     var reducirMovimiento: Bool { didSet { defaults.set(reducirMovimiento, forKey: Clave.movimiento) } }
     var vibraciones: Bool { didSet { defaults.set(vibraciones, forKey: Clave.vibraciones) } }
     var textoEnNegritas: Bool { didSet { defaults.set(textoEnNegritas, forKey: Clave.negritas) } }
+    var lecturaFacil: Bool { didSet { defaults.set(lecturaFacil, forKey: Clave.lecturaFacil) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -75,6 +77,7 @@ final class Preferencias {
         reducirMovimiento = defaults.bool(forKey: Clave.movimiento)
         vibraciones = defaults.object(forKey: Clave.vibraciones) as? Bool ?? true
         textoEnNegritas = defaults.bool(forKey: Clave.negritas)
+        lecturaFacil = defaults.bool(forKey: Clave.lecturaFacil)
     }
 
     var tamanoTexto: DynamicTypeSize? {
@@ -91,6 +94,7 @@ final class Preferencias {
         reducirMovimiento = false
         vibraciones = true
         textoEnNegritas = false
+        lecturaFacil = false
     }
 }
 
