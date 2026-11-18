@@ -58,21 +58,32 @@ struct ClasificadorRecordatorios {
         (.medicamento, "Administrar las pastillas a mi familiar"),
         (.medicamento, "Tomar el tratamiento diario a la hora indicada"),
         (.medicamento, "Recordar la dosis del medicamento de la noche"),
+        (.medicamento, "Tomar medicamento"),
+        (.medicamento, "Tomar pastillas"),
+        (.medicamento, "Paracetamol"),
+        (.medicamento, "Ibuprofeno"),
+        (.medicamento, "Tomar paracetamol para el dolor"),
+        (.medicamento, "Administrar la dosis recetada"),
 
         (.citaMedica, "Llevar a mi familiar a consulta con el doctor"),
         (.citaMedica, "Ir a la cita médica en el hospital"),
         (.citaMedica, "Acudir a revisión con el especialista"),
         (.citaMedica, "Asistir a la consulta de cardiología"),
+        (.citaMedica, "Ir al cardiólogo"),
+        (.citaMedica, "Cita médica"),
 
         (.actividadDeCuidado, "Ayudar a mi familiar a desayunar"),
         (.actividadDeCuidado, "Acompañar a la persona a bañarse"),
         (.actividadDeCuidado, "Preparar la comida de la persona que cuido"),
         (.actividadDeCuidado, "Apoyar a mi familiar para caminar"),
+        (.actividadDeCuidado, "Ayudar a bañarse"),
+        (.actividadDeCuidado, "Cambiar la ropa de cama"),
 
         (.general, "Comprar artículos de limpieza"),
         (.general, "Llamar a un amigo por teléfono"),
         (.general, "Revisar documentos personales"),
-        (.general, "Organizar una reunión familiar")
+        (.general, "Organizar una reunión familiar"),
+        (.general, "Pagar la factura del teléfono")
     ]
 
     static func clasificar(_ titulo: String) -> ResultadoClasificacion {
@@ -102,8 +113,9 @@ struct ClasificadorRecordatorios {
             return .init(categoria: .general, estado: .pocoClaro, distancia: nil)
         }
 
-        // Umbral conservador inicial; calibrarlo con pruebas del equipo.
-        if menorDistancia > 0.75 {
+        // Umbral provisional más tolerante con títulos cortos.
+        // Debe calibrarse con ejemplos positivos y negativos reales.
+        if menorDistancia > 0.95 {
             return .init(categoria: .general, estado: .pocoClaro, distancia: menorDistancia)
         }
 
