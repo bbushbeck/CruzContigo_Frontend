@@ -8,6 +8,7 @@ import Foundation
 protocol FamiliarRepository {
     func listar() async throws -> [Familiar]
     func crear(_ familiar: Familiar) async throws -> Familiar
+    func actualizar(_ familiar: Familiar) async throws -> Familiar
     func eliminar(id: UUID) async throws
 }
 
@@ -20,6 +21,10 @@ struct RemoteFamiliarRepository: FamiliarRepository {
 
     func crear(_ familiar: Familiar) async throws -> Familiar {
         try await api.post("familiares", cuerpo: familiar)
+    }
+
+    func actualizar(_ familiar: Familiar) async throws -> Familiar {
+        try await api.put("familiares/\(familiar.id.uuidString)", cuerpo: familiar)
     }
 
     func eliminar(id: UUID) async throws {
@@ -37,6 +42,15 @@ struct LocalFamiliarRepository: FamiliarRepository {
     func crear(_ familiar: Familiar) async throws -> Familiar {
         var todos = try store.cargar() ?? []
         todos.append(familiar)
+        try store.guardar(todos)
+        return familiar
+    }
+
+    func actualizar(_ familiar: Familiar) async throws -> Familiar {
+        var todos = try store.cargar() ?? []
+        if let indice = todos.firstIndex(where: { $0.id == familiar.id }) {
+            todos[indice] = familiar
+        }
         try store.guardar(todos)
         return familiar
     }

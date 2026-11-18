@@ -42,6 +42,18 @@ final class FamiliaresStore {
         }
     }
 
+    func actualizar(_ familiar: Familiar) async -> String? {
+        do {
+            let actualizado = try await repositorio.actualizar(familiar)
+            if let indice = familiares.firstIndex(where: { $0.id == familiar.id }) {
+                familiares[indice] = actualizado
+            }
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     func eliminar(_ familiar: Familiar) async {
         do {
             try await repositorio.eliminar(id: familiar.id)

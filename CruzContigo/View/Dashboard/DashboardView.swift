@@ -9,6 +9,7 @@ struct DashboardView: View {
     @Binding var pestana: Pestana
 
     @Environment(FamiliaresStore.self) private var store
+    @Environment(Preferencias.self) private var preferencias
     @Environment(\.dynamicTypeSize) private var tipo
     @AppStorage(ClavesApp.personaSeleccionada) private var seleccionID = ""
     @AppStorage(ClavesApp.primerosPasosOcultos) private var primerosPasosOcultos = false
@@ -31,14 +32,23 @@ struct DashboardView: View {
                         .buttonStyle(.plain)
                     if let seleccionada {
                         seccionAccesos(seleccionada)
-                        if !primerosPasosOcultos {
-                            PrimerosPasosView(
-                                persona: seleccionada,
-                                abrir: { ruta.append($0) },
-                                ocultar: { withAnimation { primerosPasosOcultos = true } }
-                            )
+                        if preferencias.lecturaFacil {
+                            NavigationLink(value: Ruta.modulo(.accesibilidad, familiarID: nil)) {
+                                Label("Ajustes de accesibilidad", systemImage: "accessibility")
+                                    .font(.app(.headline))
+                                    .frame(maxWidth: .infinity, minHeight: 52)
+                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
+                            }
+                        } else {
+                            if !primerosPasosOcultos {
+                                PrimerosPasosView(
+                                    persona: seleccionada,
+                                    abrir: { ruta.append($0) },
+                                    ocultar: { withAnimation { primerosPasosOcultos = true } }
+                                )
+                            }
+                            seccionRecordatorios
                         }
-                        seccionRecordatorios
                     }
                 }
                 .padding(.horizontal, 20)
@@ -79,7 +89,7 @@ struct DashboardView: View {
                     .font(.app(.title3).weight(.bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                if !tipo.isAccessibilitySize {
+                if !(tipo.isAccessibilitySize || preferencias.lecturaFacil) {
                     Text("Cuidar es estar juntos")
                         .font(.app(.caption2))
                         .foregroundColor(.textoSuave)
@@ -158,7 +168,7 @@ struct DashboardView: View {
                 EstadoVacioFamiliares {
                     ruta.append(.agregarFamiliar)
                 }
-            } else if tipo.isAccessibilitySize {
+            } else if (tipo.isAccessibilitySize || preferencias.lecturaFacil) {
                 listaVertical
             } else {
                 carrusel
@@ -238,7 +248,7 @@ struct DashboardView: View {
                     EnlaceTexto(titulo: "Perfil de \(persona.nombre)")
                 }
             }
-            if tipo.isAccessibilitySize {
+            if (tipo.isAccessibilitySize || preferencias.lecturaFacil) {
                 VStack(spacing: 10) {
                     ForEach(Modulo.accesosRapidos) { modulo in
                         NavigationLink(value: Ruta.modulo(modulo, familiarID: persona.id)) {

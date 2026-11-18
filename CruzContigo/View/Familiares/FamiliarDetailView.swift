@@ -11,6 +11,7 @@ struct FamiliarDetailView: View {
     @Environment(FamiliaresStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var confirmarEliminar = false
+    @State private var editando = false
 
     private var familiar: Familiar? {
         store.familiares.first { $0.id == familiarID }
@@ -21,6 +22,10 @@ struct FamiliarDetailView: View {
             HStack {
                 BrandBackButton { dismiss() }
                 Spacer()
+                if familiar?.puedeEditar == true {
+                    Button("Editar") { editando = true }
+                        .frame(minHeight: 44)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
@@ -43,6 +48,9 @@ struct FamiliarDetailView: View {
                     .foregroundColor(.textoSuave)
                 Spacer()
             }
+        }
+        .sheet(isPresented: $editando) {
+            if let familiar { EditFamiliarView(familiar: familiar) }
         }
         .confirmationDialog(
             "¿Eliminar a \(familiar?.nombre ?? "este familiar")?",

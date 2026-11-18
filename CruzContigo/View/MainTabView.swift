@@ -15,6 +15,7 @@ enum ClavesApp {
 }
 
 struct MainTabView: View {
+    @Environment(Preferencias.self) private var preferencias
     @State private var pestana: Pestana = .inicio
 
     init() {
@@ -31,13 +32,15 @@ struct MainTabView: View {
             Tab("Inicio", systemImage: "house.fill", value: .inicio) {
                 DashboardView(pestana: $pestana)
             }
-            Tab("Personas", systemImage: "person.2.fill", value: .personas) {
-                PersonasView()
-            }
-            Tab("Recordatorios", systemImage: "bell.fill", value: .recordatorios) {
-                NavigationStack {
-                    RecordatoriosView(mostrarAtras: false)
-                        .toolbar(.hidden, for: .navigationBar)
+            if !preferencias.lecturaFacil {
+                Tab("Personas", systemImage: "person.2.fill", value: .personas) {
+                    PersonasView()
+                }
+                Tab("Recordatorios", systemImage: "bell.fill", value: .recordatorios) {
+                    NavigationStack {
+                        RecordatoriosView(mostrarAtras: false)
+                            .toolbar(.hidden, for: .navigationBar)
+                    }
                 }
             }
             Tab("Más", systemImage: "line.3.horizontal", value: .mas) {

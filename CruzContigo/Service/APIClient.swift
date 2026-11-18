@@ -84,7 +84,9 @@ struct APIClient {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = metodo
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let token = token ?? AuthTokenStore.shared.cargar() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         if let cuerpo {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try Self.encoder.encode(cuerpo)
