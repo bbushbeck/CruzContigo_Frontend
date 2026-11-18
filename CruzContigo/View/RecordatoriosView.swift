@@ -1,30 +1,24 @@
 import SwiftUI
 
 struct RecordatoriosView: View {
-    var familiarID: UUID? = nil
-    var mostrarAtras = true
+    var familiarID: UUID?
+    var mostrarAtras: Bool
 
     @Environment(FamiliaresStore.self) private var familiares
     @Environment(\.dismiss) private var dismiss
-    @State private var recordatorios: [Recordatorio] = []
-    @State private var cargando = false
-    @State private var guardando = false
-    @State private var mensajeCarga: String?
-    @State private var mensajeOperacion: String?
+    @State private var viewModel: RecordatoriosViewModel
     @State private var formulario: Formulario?
     @State private var porEliminar: Recordatorio?
-
-    private let servicio = RecordatoriosService()
-    private let notificaciones = NotificationHandler()
 
     private struct Formulario: Identifiable {
         let id = UUID()
         var recordatorio: Recordatorio? = nil
     }
 
-    private var visibles: [Recordatorio] {
-        recordatorios.filter { familiarID == nil || $0.familiarID == familiarID }
-            .sorted { $0.fecha < $1.fecha }
+    init(familiarID: UUID? = nil, mostrarAtras: Bool = true) {
+        self.familiarID = familiarID
+        self.mostrarAtras = mostrarAtras
+        _viewModel = State(initialValue: RecordatoriosViewModel(familiarID: familiarID))
     }
 
     private func nombre(de id: UUID) -> String {
@@ -53,17 +47,17 @@ struct RecordatoriosView: View {
                             .foregroundStyle(Color.textoSuave)
                     }
 
-                    if cargando && visibles.isEmpty {
+                    if viewModel.cargando && viewModel.visibles.isEmpty {
                         ProgressView("Cargando recordatorios…")
-                    } else if let mensajeCarga {
+                    } else if let mensajeCarga = viewModel.mensajeCarga {
                         EstadoErrorView(mensaje: mensajeCarga) {
-                            Task { await cargar() }
+                            Task { await viewModel.cargar() }
                         }
-                    } else if visibles.isEmpty {
+                    } else if viewModel.visibles.isEmpty {
                         ContentUnavailableView("Sin recordatorios", systemImage: "bell")
                     }
 
-                    ForEach(visibles) { recordatorio in
+                    ForEach(viewModel.visibles) { recordatorio in
                         fila(recordatorio)
                     }
 
@@ -74,15 +68,15 @@ struct RecordatoriosView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(familiares.familiares.isEmpty || guardando || cargando)
+                    .disabled(familiares.familiares.isEmpty || viewModel.guardando || viewModel.cargando)
                 }
                 .padding()
             }
-            .refreshable { await cargar() }
+            .refreshable { await viewModel.cargar() }
         }
         .task {
             if familiares.estado == .inicial { await familiares.cargar() }
-            await cargar()
+            await viewModel.cargar()
         }
         .sheet(item: $formulario) { formulario in
             EditorRecordatorioView(
@@ -90,7 +84,11 @@ struct RecordatoriosView: View {
                 familiarInicial: familiarID ?? familiares.familiares.first?.id,
                 recordatorio: formulario.recordatorio
             ) { datos in
-                try await guardar(datos, id: formulario.recordatorio?.id)
+                try await viewModel.guardar(
+                    datos,
+                    id: formulario.recordatorio?.id,
+                    familiares: familiares.familiares
+                )
             }
         }
         .confirmationDialog(
@@ -100,17 +98,17 @@ struct RecordatoriosView: View {
             presenting: porEliminar
         ) { recordatorio in
             Button("Eliminar", role: .destructive) {
-                Task { await eliminar(recordatorio) }
+                Task { await viewModel.eliminar(recordatorio) }
             }
         } message: { recordatorio in
             Text(recordatorio.titulo)
         }
         .alert("No se pudo actualizar", isPresented: Binding(
-            get: { mensajeOperacion != nil }, set: { if !$0 { mensajeOperacion = nil } }
+            get: { viewModel.mensajeOperacion != nil }, set: { if !$0 { viewModel.mensajeOperacion = nil } }
         )) {
             Button("Aceptar", role: .cancel) {}
         } message: {
-            Text(mensajeOperacion ?? "")
+            Text(viewModel.mensajeOperacion ?? "")
         }
     }
 
@@ -129,15 +127,7 @@ struct RecordatoriosView: View {
             }
             Spacer()
             Button {
-                Task {
-                    var datos = recordatorio.datos
-                    datos.completado.toggle()
-                    do {
-                        try await guardar(datos, id: recordatorio.id)
-                    } catch {
-                        mensajeOperacion = error.localizedDescription
-                    }
-                }
+                Task { await viewModel.alternarCompletado(recordatorio, familiares: familiares.familiares) }
             } label: {
                 Image(systemName: recordatorio.completado ? "checkmark.circle.fill" : "circle")
                     .icono(.seleccion)
@@ -158,48 +148,9 @@ struct RecordatoriosView: View {
             }
             .accessibilityLabel("Opciones de \(recordatorio.titulo)")
         }
-        .disabled(guardando || cargando)
+        .disabled(viewModel.guardando || viewModel.cargando)
         .padding(12)
         .background(Color.tintaSuave, in: RoundedRectangle(cornerRadius: 15))
-    }
-
-    private func cargar() async {
-        guard !cargando, !guardando else { return }
-        cargando = true
-        defer { cargando = false }
-        do {
-            let respuesta = try await servicio.listar()
-            guard !Task.isCancelled else { return }
-            recordatorios = respuesta
-            mensajeCarga = nil
-        } catch {
-            if !Task.isCancelled { mensajeCarga = error.localizedDescription }
-        }
-    }
-
-    private func guardar(_ datos: DatosRecordatorio, id: UUID?) async throws {
-        guard !cargando, !guardando else {
-            throw APIError.servidor("Espera a que termine la actualización.")
-        }
-        guardando = true
-        defer { guardando = false }
-        let guardado = try await servicio.guardar(datos, id: id)
-        recordatorios.removeAll { $0.id == guardado.id }
-        recordatorios.append(guardado)
-        await notificaciones.actualizar(guardado, nombre: nombre(de: guardado.familiarID))
-    }
-
-    private func eliminar(_ recordatorio: Recordatorio) async {
-        guard !cargando, !guardando else { return }
-        guardando = true
-        defer { guardando = false }
-        do {
-            try await servicio.eliminar(id: recordatorio.id)
-            recordatorios.removeAll { $0.id == recordatorio.id }
-            notificaciones.cancelar(id: recordatorio.id)
-        } catch {
-            mensajeOperacion = error.localizedDescription
-        }
     }
 }
 
@@ -208,12 +159,7 @@ private struct EditorRecordatorioView: View {
 
     let familiares: [Familiar]
     let recordatorio: Recordatorio?
-    let onGuardar: (DatosRecordatorio) async throws -> Void
-    @State private var titulo: String
-    @State private var familiarID: UUID?
-    @State private var fecha: Date
-    @State private var guardando = false
-    @State private var error: String?
+    @State private var viewModel: EditorRecordatorioViewModel
 
     init(
         familiares: [Familiar], familiarInicial: UUID?, recordatorio: Recordatorio?,
@@ -221,65 +167,48 @@ private struct EditorRecordatorioView: View {
     ) {
         self.familiares = familiares
         self.recordatorio = recordatorio
-        self.onGuardar = onGuardar
-        _titulo = State(initialValue: recordatorio?.titulo ?? "")
-        _familiarID = State(initialValue: recordatorio?.familiarID ?? familiarInicial)
-        _fecha = State(initialValue: recordatorio?.fecha ?? Date().addingTimeInterval(300))
+        _viewModel = State(initialValue: EditorRecordatorioViewModel(
+            familiarInicial: familiarInicial,
+            recordatorio: recordatorio,
+            onGuardar: onGuardar
+        ))
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Nombre del recordatorio", text: $titulo)
-                Picker("Familiar", selection: $familiarID) {
+                TextField("Nombre del recordatorio", text: $viewModel.titulo)
+                Picker("Familiar", selection: $viewModel.familiarID) {
                     ForEach(familiares) { familiar in
                         Text(familiar.nombreCompleto).tag(Optional(familiar.id))
                     }
                 }
                 if let recordatorio {
-                    DatePicker("Fecha y hora", selection: $fecha, in: min(recordatorio.fecha, .now)...)
+                    DatePicker("Fecha y hora", selection: $viewModel.fecha, in: min(recordatorio.fecha, .now)...)
                 } else {
-                    DatePicker("Fecha y hora", selection: $fecha, in: Date.now...)
+                    DatePicker("Fecha y hora", selection: $viewModel.fecha, in: Date.now...)
                 }
-                if let error {
+                if let error = viewModel.error {
                     Text(error).foregroundStyle(Color.brandRed)
                 }
             }
-            .disabled(guardando)
+            .disabled(viewModel.guardando)
             .navigationTitle(recordatorio == nil ? "Nuevo recordatorio" : "Editar recordatorio")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }.disabled(guardando)
+                    Button("Cancelar") { dismiss() }.disabled(viewModel.guardando)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Guardar") {
-                        Task { await guardar() }
+                        Task {
+                            if await viewModel.guardar() { dismiss() }
+                        }
                     }
-                    .disabled(guardando || familiarID == nil || tituloLimpio.isEmpty || tituloLimpio.count > 120)
+                    .disabled(!viewModel.puedeGuardar)
                 }
             }
         }
-        .interactiveDismissDisabled(guardando)
+        .interactiveDismissDisabled(viewModel.guardando)
         .tint(.brandRed)
-    }
-
-    private var tituloLimpio: String {
-        titulo.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func guardar() async {
-        guard !guardando, let familiarID else { return }
-        guardando = true
-        error = nil
-        defer { guardando = false }
-        do {
-            try await onGuardar(DatosRecordatorio(
-                titulo: tituloLimpio, familiarID: familiarID, fecha: fecha,
-                completado: recordatorio?.completado ?? false
-            ))
-            dismiss()
-        } catch {
-            self.error = error.localizedDescription
-        }
     }
 }

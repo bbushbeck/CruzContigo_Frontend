@@ -11,16 +11,15 @@ struct DashboardView: View {
     @Environment(FamiliaresStore.self) private var store
     @Environment(Preferencias.self) private var preferencias
     @Environment(\.dynamicTypeSize) private var tipo
-    @AppStorage(ClavesApp.personaSeleccionada) private var seleccionID = ""
     @AppStorage(ClavesApp.primerosPasosOcultos) private var primerosPasosOcultos = false
+    @State private var viewModel = DashboardViewModel()
     @State private var ruta: [Ruta] = []
     @State private var mostrarEmergencia = false
     @State private var mostrarFrida = false
-    @State private var destinoFrida: Ruta?
     @Environment(\.openURL) private var abrirURL
 
     private var seleccionada: Familiar? {
-        store.familiares.first { $0.id.uuidString == seleccionID } ?? store.familiares.first
+        store.familiares.first { $0.id.uuidString == viewModel.seleccionID } ?? store.familiares.first
     }
 
     var body: some View {
@@ -69,7 +68,7 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $mostrarFrida, onDismiss: navegarDesdeFrida) {
             FridaView(familiarSeleccionado: seleccionada?.id) { destino in
-                destinoFrida = destino
+                viewModel.destinoFrida = destino
                 mostrarFrida = false
             }
         }
@@ -112,9 +111,8 @@ struct DashboardView: View {
     }
 
     private func navegarDesdeFrida() {
-        guard let destinoFrida else { return }
-        ruta.append(destinoFrida)
-        self.destinoFrida = nil
+        guard let destino = viewModel.navegarDesdeFrida() else { return }
+        ruta.append(destino)
     }
 
     private var encabezado: some View {
@@ -155,28 +153,12 @@ struct DashboardView: View {
 
     private var saludo: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(textoSaludo)
+            Text(viewModel.textoSaludo)
                 .font(.app(.largeTitle).weight(.bold))
                 .accessibilityAddTraits(.isHeader)
-            Text(subtitulo)
+            Text(viewModel.subtitulo(para: store.familiares))
                 .font(.app(.body))
                 .foregroundColor(.textoSuave)
-        }
-    }
-
-    private var textoSaludo: String {
-        switch Calendar.current.component(.hour, from: Date()) {
-        case 5..<12: "¡Buenos días!"
-        case 12..<19: "¡Buenas tardes!"
-        default: "¡Buenas noches!"
-        }
-    }
-
-    private var subtitulo: String {
-        switch store.familiares.count {
-        case 0: "Empecemos por registrar a la persona que cuidas."
-        case 1: "Aquí tienes lo importante sobre \(store.familiares[0].nombre)."
-        default: "Elige a quién quieres atender ahora."
         }
     }
 
@@ -247,7 +229,7 @@ struct DashboardView: View {
             .padding(.horizontal, 20)
         }
         .padding(.horizontal, -20)
-        .vibracion(.selection, trigger: seleccionID)
+        .vibracion(.selection, trigger: viewModel.seleccionID)
     }
 
     private var listaVertical: some View {
@@ -343,7 +325,7 @@ struct DashboardView: View {
 
     private func seleccionar(_ familiar: Familiar) {
         withAnimation(.snappy(duration: 0.2)) {
-            seleccionID = familiar.id.uuidString
+            viewModel.seleccionar(familiar)
         }
     }
 }

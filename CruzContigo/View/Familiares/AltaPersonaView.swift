@@ -12,41 +12,24 @@ struct AltaPersonaView: View {
     @Environment(FamiliaresStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.reducirMovimiento) private var reducirMovimiento
-    @AppStorage(ClavesApp.personaSeleccionada) private var seleccionID = ""
 
-    @State private var draft = FamiliarDraft()
-    @State private var paso: Paso = .nombre
-    @State private var avanzando = true
-    @State private var pasosIntentados: Set<Paso> = []
-    @State private var volverARevision = false
-    @State private var guardando = false
-    @State private var errorGuardado: String?
-    @State private var creado: Familiar?
+    @State private var viewModel = AltaPersonaViewModel()
     @State private var confirmarSalida = false
-    @State private var intentosFallidos = 0
     @FocusState private var foco: Campo?
     @AccessibilityFocusState private var tituloEnfocado: Bool
 
-    private var errores: [Campo: String] {
-        pasosIntentados.contains(paso) ? draft.errores(en: paso) : [:]
-    }
-
-    private var nombre: String {
-        draft.nombreCorto.isEmpty ? "esta persona" : draft.nombreCorto
-    }
-
     var body: some View {
         Group {
-            if let creado {
+            if let creado = viewModel.creado {
                 AltaExitosaView(persona: creado) { dismiss() }
                     .transition(.opacity)
             } else {
                 flujo
             }
         }
-        .animation(reducirMovimiento ? nil : .easeInOut(duration: 0.25), value: creado != nil)
-        .vibracion(.error, trigger: intentosFallidos)
-        .vibracion(.success, trigger: creado != nil)
+        .animation(reducirMovimiento ? nil : .easeInOut(duration: 0.25), value: viewModel.creado != nil)
+        .vibracion(.error, trigger: viewModel.intentosFallidos)
+        .vibracion(.success, trigger: viewModel.creado != nil)
         .confirmationDialog("¿Salir sin guardar?", isPresented: $confirmarSalida, titleVisibility: .visible) {
             Button("Salir sin guardar", role: .destructive) { dismiss() }
             Button("Seguir editando", role: .cancel) {}
@@ -54,12 +37,12 @@ struct AltaPersonaView: View {
             Text("Se perderán los datos que escribiste.")
         }
         .alert("No se pudo guardar", isPresented: Binding(
-            get: { errorGuardado != nil },
-            set: { if !$0 { errorGuardado = nil } }
+            get: { viewModel.errorGuardado != nil },
+            set: { if !$0 { viewModel.errorGuardado = nil } }
         )) {
             Button("Aceptar", role: .cancel) {}
         } message: {
-            Text(errorGuardado ?? "")
+            Text(viewModel.errorGuardado ?? "")
         }
     }
 
@@ -78,7 +61,7 @@ struct AltaPersonaView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color(.systemBackground))
-                .id(paso)
+                .id(viewModel.paso)
                 .transition(transicion)
             }
             .frame(maxHeight: .infinity)
@@ -86,7 +69,7 @@ struct AltaPersonaView: View {
 
             pie
         }
-        .onChange(of: paso) {
+        .onChange(of: viewModel.paso) {
             enfocarInicio()
         }
         .onAppear {
@@ -97,8 +80,8 @@ struct AltaPersonaView: View {
     private var transicion: AnyTransition {
         if reducirMovimiento { return .opacity }
         return .asymmetric(
-            insertion: .move(edge: avanzando ? .trailing : .leading).combined(with: .opacity),
-            removal: .move(edge: avanzando ? .leading : .trailing).combined(with: .opacity)
+            insertion: .move(edge: viewModel.avanzando ? .trailing : .leading).combined(with: .opacity),
+            removal: .move(edge: viewModel.avanzando ? .leading : .trailing).combined(with: .opacity)
         )
     }
 
@@ -114,11 +97,11 @@ struct AltaPersonaView: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel(paso == .nombre ? "Salir" : "Paso anterior")
+                .accessibilityLabel(viewModel.paso == .nombre ? "Salir" : "Paso anterior")
 
                 Spacer()
 
-                Text(paso == .revision ? "Revisión final" : "Paso \(paso.rawValue + 1) de \(Paso.preguntas.count)")
+                Text(viewModel.paso == .revision ? "Revisión final" : "Paso \(viewModel.paso.rawValue + 1) de \(Paso.preguntas.count)")
                     .font(.app(.subheadline).weight(.semibold))
                     .foregroundColor(.textoSuave)
 
@@ -136,15 +119,15 @@ struct AltaPersonaView: View {
                 .accessibilityLabel("Cancelar y salir")
             }
 
-            ProgressBarView(progress: Double(paso.rawValue + 1) / Double(Paso.allCases.count))
-                .animation(reducirMovimiento ? nil : .easeInOut, value: paso)
+            ProgressBarView(progress: Double(viewModel.paso.rawValue + 1) / Double(Paso.allCases.count))
+                .animation(reducirMovimiento ? nil : .easeInOut, value: viewModel.paso)
                 .accessibilityHidden(true)
         }
     }
 
     @ViewBuilder
     private var contenidoPaso: some View {
-        switch paso {
+        switch viewModel.paso {
         case .nombre: pasoNombre
         case .relacion: pasoRelacion
         case .nacimiento: pasoNacimiento
@@ -179,7 +162,7 @@ struct AltaPersonaView: View {
 
             Button {
                 SelectorContactos.presentar { contacto in
-                    draft.completar(con: contacto)
+                    viewModel.draft.completar(con: contacto)
                 }
             } label: {
                 Label("Elegir de mis contactos", systemImage: "person.crop.circle.badge.plus")
@@ -193,8 +176,8 @@ struct AltaPersonaView: View {
             CampoTexto(
                 titulo: "Nombre(s)",
                 ejemplo: "Rosa María",
-                texto: $draft.nombre,
-                error: errores[.nombre],
+                texto: $viewModel.draft.nombre,
+                error: viewModel.errores[.nombre],
                 foco: $foco,
                 campo: .nombre,
                 contenido: .givenName,
@@ -204,8 +187,8 @@ struct AltaPersonaView: View {
             CampoTexto(
                 titulo: "Apellidos",
                 ejemplo: "Hernández López",
-                texto: $draft.apellidos,
-                error: errores[.apellidos],
+                texto: $viewModel.draft.apellidos,
+                error: viewModel.errores[.apellidos],
                 foco: $foco,
                 campo: .apellidos,
                 contenido: .familyName,
@@ -217,47 +200,47 @@ struct AltaPersonaView: View {
     private var pasoRelacion: some View {
         VStack(alignment: .leading, spacing: 16) {
             pregunta(
-                "¿Qué es \(nombre) para ti?",
+                "¿Qué es \(viewModel.nombre) para ti?",
                 ayuda: "Nos ayuda a personalizar los mensajes y recordatorios."
             )
 
-            MensajeError(texto: errores[.parentesco])
+            MensajeError(texto: viewModel.errores[.parentesco])
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
                 ForEach(Parentesco.allCases) { opcion in
                     OpcionGrande(
                         titulo: opcion.titulo,
-                        seleccionada: draft.parentesco == opcion,
+                        seleccionada: viewModel.draft.parentesco == opcion,
                         compacta: true
                     ) {
-                        draft.parentesco = opcion
+                        viewModel.draft.parentesco = opcion
                     }
                 }
             }
-            .vibracion(.selection, trigger: draft.parentesco)
+            .vibracion(.selection, trigger: viewModel.draft.parentesco)
         }
     }
 
     private var pasoNacimiento: some View {
         VStack(alignment: .leading, spacing: 20) {
             pregunta(
-                "¿Cuándo nació \(nombre)?",
+                "¿Cuándo nació \(viewModel.nombre)?",
                 ayuda: "Por ejemplo: 15 de marzo de 1952."
             )
 
             HStack(alignment: .top, spacing: 12) {
-                CampoNumero(titulo: "Día", ejemplo: "15", texto: $draft.dia, maximo: 2, error: errores[.dia] != nil, foco: $foco, campo: .dia)
+                CampoNumero(titulo: "Día", ejemplo: "15", texto: $viewModel.draft.dia, maximo: 2, error: viewModel.errores[.dia] != nil, foco: $foco, campo: .dia)
                     .frame(maxWidth: 90)
                 selectorMes
-                CampoNumero(titulo: "Año", ejemplo: "1952", texto: $draft.anio, maximo: 4, error: errores[.anio] != nil, foco: $foco, campo: .anio)
+                CampoNumero(titulo: "Año", ejemplo: "1952", texto: $viewModel.draft.anio, maximo: 4, error: viewModel.errores[.anio] != nil, foco: $foco, campo: .anio)
                     .frame(maxWidth: 110)
             }
 
             ForEach([Campo.dia, .mes, .anio], id: \.self) { campo in
-                MensajeError(texto: errores[campo])
+                MensajeError(texto: viewModel.errores[campo])
             }
 
-            if let edad = draft.edad {
+            if let edad = viewModel.draft.edad {
                 Label("Tiene \(edad) \(edad == 1 ? "año" : "años")", systemImage: "birthday.cake")
                     .font(.app(.headline))
                     .foregroundColor(.brandRed)
@@ -268,8 +251,8 @@ struct AltaPersonaView: View {
                     .accessibilityAddTraits(.updatesFrequently)
             }
         }
-        .animation(reducirMovimiento ? nil : .spring(duration: 0.3), value: draft.edad)
-        .onChange(of: draft.dia) { _, nuevo in
+        .animation(reducirMovimiento ? nil : .spring(duration: 0.3), value: viewModel.draft.edad)
+        .onChange(of: viewModel.draft.dia) { _, nuevo in
             if nuevo.count == 2 { foco = nil }
         }
     }
@@ -279,15 +262,15 @@ struct AltaPersonaView: View {
             Text("Mes")
                 .font(.app(.headline))
             Menu {
-                Picker("Mes", selection: $draft.mes) {
+                Picker("Mes", selection: $viewModel.draft.mes) {
                     ForEach(1...12, id: \.self) { m in
                         Text(FamiliarDraft.meses[m - 1].capitalized).tag(Optional(m))
                     }
                 }
             } label: {
                 HStack {
-                    Text(draft.mes.map { FamiliarDraft.meses[$0 - 1].capitalized } ?? "Elegir")
-                        .foregroundColor(draft.mes == nil ? Color(.placeholderText) : .primary)
+                    Text(viewModel.draft.mes.map { FamiliarDraft.meses[$0 - 1].capitalized } ?? "Elegir")
+                        .foregroundColor(viewModel.draft.mes == nil ? Color(.placeholderText) : .primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Spacer(minLength: 4)
@@ -298,21 +281,21 @@ struct AltaPersonaView: View {
                 .font(.app(.title3))
                 .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity, minHeight: 56)
-                .fieldBorder(errores[.mes] != nil)
+                .fieldBorder(viewModel.errores[.mes] != nil)
             }
             .accessibilityLabel("Mes")
-            .accessibilityValue(draft.mes.map { FamiliarDraft.meses[$0 - 1] } ?? "sin elegir")
+            .accessibilityValue(viewModel.draft.mes.map { FamiliarDraft.meses[$0 - 1] } ?? "sin elegir")
         }
     }
 
     private var pasoCuidado: some View {
         VStack(alignment: .leading, spacing: 16) {
             pregunta(
-                "¿Qué tipo de cuidado necesita \(nombre)?",
+                "¿Qué tipo de cuidado necesita \(viewModel.nombre)?",
                 ayuda: "Elige la opción que más se parezca. Podrás cambiarla después."
             )
 
-            MensajeError(texto: errores[.tipoCuidado])
+            MensajeError(texto: viewModel.errores[.tipoCuidado])
 
             VStack(spacing: 12) {
                 ForEach(TipoCuidado.allCases) { opcion in
@@ -320,28 +303,28 @@ struct AltaPersonaView: View {
                         titulo: opcion.titulo,
                         descripcion: opcion.descripcion,
                         icono: opcion.icono,
-                        seleccionada: draft.tipoCuidado == opcion
+                        seleccionada: viewModel.draft.tipoCuidado == opcion
                     ) {
-                        draft.tipoCuidado = opcion
+                        viewModel.draft.tipoCuidado = opcion
                     }
                 }
             }
-            .vibracion(.selection, trigger: draft.tipoCuidado)
+            .vibracion(.selection, trigger: viewModel.draft.tipoCuidado)
         }
     }
 
     private var pasoContacto: some View {
         VStack(alignment: .leading, spacing: 20) {
             pregunta(
-                "¿Quieres agregar el teléfono de \(nombre)?",
+                "¿Quieres agregar el teléfono de \(viewModel.nombre)?",
                 ayuda: "Es opcional. Te permitirá llamarle desde la app, incluso en una emergencia."
             )
 
             CampoTexto(
                 titulo: "Teléfono (opcional)",
                 ejemplo: "81 1234 5678",
-                texto: $draft.telefono,
-                error: errores[.telefono],
+                texto: $viewModel.draft.telefono,
+                error: viewModel.errores[.telefono],
                 foco: $foco,
                 campo: .telefono,
                 contenido: .telephoneNumber,
@@ -351,7 +334,7 @@ struct AltaPersonaView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("¿Algo que debamos saber? (opcional)")
                     .font(.app(.headline))
-                TextField("Ej. Usa bastón, prefiere que le digan Rosy", text: $draft.notas, axis: .vertical)
+                TextField("Ej. Usa bastón, prefiere que le digan Rosy", text: $viewModel.draft.notas, axis: .vertical)
                     .font(.app(.title3))
                     .lineLimit(3...6)
                     .padding(16)
@@ -365,23 +348,23 @@ struct AltaPersonaView: View {
     private var pasoRevision: some View {
         VStack(alignment: .leading, spacing: 20) {
             pregunta(
-                "Revisa los datos de \(nombre)",
+                "Revisa los datos de \(viewModel.nombre)",
                 ayuda: "Si algo no está bien, toca «Cambiar»."
             )
 
             VStack(spacing: 0) {
-                FilaRevision(titulo: "Nombre", valor: "\(draft.nombre) \(draft.apellidos)") { ir(a: .nombre) }
+                FilaRevision(titulo: "Nombre", valor: "\(viewModel.draft.nombre) \(viewModel.draft.apellidos)") { ir(a: .nombre) }
                 Divider().padding(.leading, 16)
-                FilaRevision(titulo: "Relación contigo", valor: draft.parentesco?.titulo ?? "—") { ir(a: .relacion) }
+                FilaRevision(titulo: "Relación contigo", valor: viewModel.draft.parentesco?.titulo ?? "—") { ir(a: .relacion) }
                 Divider().padding(.leading, 16)
-                FilaRevision(titulo: "Fecha de nacimiento", valor: textoFecha) { ir(a: .nacimiento) }
+                FilaRevision(titulo: "Fecha de nacimiento", valor: viewModel.textoFecha) { ir(a: .nacimiento) }
                 Divider().padding(.leading, 16)
-                FilaRevision(titulo: "Tipo de cuidado", valor: draft.tipoCuidado?.titulo ?? "—") { ir(a: .cuidado) }
+                FilaRevision(titulo: "Tipo de cuidado", valor: viewModel.draft.tipoCuidado?.titulo ?? "—") { ir(a: .cuidado) }
                 Divider().padding(.leading, 16)
-                FilaRevision(titulo: "Teléfono", valor: draft.telefono.isEmpty ? "Sin teléfono" : formatearTelefono(draft.telefonoDigitos)) { ir(a: .contacto) }
-                if !draft.notas.isEmpty {
+                FilaRevision(titulo: "Teléfono", valor: viewModel.draft.telefono.isEmpty ? "Sin teléfono" : viewModel.formatearTelefono(viewModel.draft.telefonoDigitos)) { ir(a: .contacto) }
+                if !viewModel.draft.notas.isEmpty {
                     Divider().padding(.leading, 16)
-                    FilaRevision(titulo: "Notas", valor: draft.notas) { ir(a: .contacto) }
+                    FilaRevision(titulo: "Notas", valor: viewModel.draft.notas) { ir(a: .contacto) }
                 }
             }
             .tarjetaBorde()
@@ -395,21 +378,15 @@ struct AltaPersonaView: View {
         }
     }
 
-    private var textoFecha: String {
-        guard let f = draft.fechaNacimiento else { return "—" }
-        let texto = f.formatted(.dateTime.day().month(.wide).year().locale(Locale(identifier: "es_MX")))
-        return draft.edad.map { "\(texto) · \($0) años" } ?? texto
-    }
-
     private var pie: some View {
         VStack(spacing: 10) {
-            PrimaryButton(title: textoBoton) {
+            PrimaryButton(title: viewModel.textoBoton) {
                 continuar()
             }
-            .disabled(guardando)
-            .opacity(guardando ? 0.7 : 1)
+            .disabled(viewModel.guardando)
+            .opacity(viewModel.guardando ? 0.7 : 1)
 
-            if paso == .contacto && draft.telefono.isEmpty && draft.notas.isEmpty {
+            if viewModel.paso == .contacto && viewModel.draft.telefono.isEmpty && viewModel.draft.notas.isEmpty {
                 Button("Omitir por ahora") {
                     continuar()
                 }
@@ -424,60 +401,31 @@ struct AltaPersonaView: View {
         .background(Color(.systemBackground).shadow(color: .black.opacity(0.06), radius: 8, y: -4))
     }
 
-    private var textoBoton: String {
-        if guardando { return "Guardando…" }
-        if paso == .revision { return "Guardar a \(nombre)" }
-        if volverARevision { return "Volver a la revisión" }
-        return "Continuar"
-    }
-
     private func continuar() {
-        if paso == .revision {
-            Task { await guardar() }
-            return
-        }
-        pasosIntentados.insert(paso)
-        let erroresPaso = draft.errores(en: paso)
-        guard erroresPaso.isEmpty else {
-            intentosFallidos += 1
-            if let campo = paso.campos.first(where: { erroresPaso[$0] != nil }) {
-                if [.nombre, .apellidos, .dia, .anio, .telefono].contains(campo) { foco = campo }
-                if let mensaje = erroresPaso[campo] {
-                    AccessibilityNotification.Announcement(mensaje).post()
-                }
-            }
-            return
-        }
-        foco = nil
-        avanzando = true
-        cambiar {
-            if volverARevision {
-                volverARevision = false
-                paso = .revision
-            } else if let siguiente = Paso(rawValue: paso.rawValue + 1) {
-                paso = siguiente
-            }
+        switch viewModel.continuar(cambiar: cambiar) {
+        case .avanzar:
+            foco = nil
+        case .guardar:
+            Task { await viewModel.guardar(usando: store, cambiar: cambiar) }
+        case .error(let campo, let mensaje):
+            if let campo { foco = campo }
+            if let mensaje { AccessibilityNotification.Announcement(mensaje).post() }
         }
     }
 
     private func atras() {
-        guard let anterior = Paso(rawValue: paso.rawValue - 1) else {
+        if viewModel.atras(cambiar: cambiar) {
             salir()
-            return
+        } else {
+            foco = nil
         }
-        foco = nil
-        avanzando = false
-        volverARevision = false
-        cambiar { paso = anterior }
     }
 
     private func ir(a destino: Paso) {
-        avanzando = false
-        volverARevision = true
-        cambiar { paso = destino }
+        cambiar { viewModel.ir(a: destino) }
     }
 
-    private func cambiar(_ accion: () -> Void) {
+    private func cambiar(_ accion: @escaping () -> Void) {
         if reducirMovimiento {
             accion()
         } else {
@@ -486,43 +434,15 @@ struct AltaPersonaView: View {
     }
 
     private func salir() {
-        if draft.tieneDatos { confirmarSalida = true } else { dismiss() }
+        if viewModel.salir() { confirmarSalida = true } else { dismiss() }
     }
 
     private func enfocarInicio() {
         Task {
             try? await Task.sleep(for: .milliseconds(450))
             tituloEnfocado = true
-            switch paso {
-            case .nombre where draft.nombre.isEmpty: foco = .nombre
-            case .nacimiento where draft.dia.isEmpty: foco = .dia
-            default: break
-            }
+            if let campo = viewModel.enfocarInicio() { foco = campo }
         }
-    }
-
-    private func guardar() async {
-        guard let familiar = draft.construir() else {
-            if let primero = Paso.preguntas.first(where: { !draft.errores(en: $0).isEmpty }) {
-                pasosIntentados.insert(primero)
-                ir(a: primero)
-            }
-            intentosFallidos += 1
-            return
-        }
-        guardando = true
-        defer { guardando = false }
-        if let error = await store.agregar(familiar) {
-            errorGuardado = error
-        } else {
-            seleccionID = familiar.id.uuidString
-            creado = familiar
-        }
-    }
-
-    private func formatearTelefono(_ t: String) -> String {
-        guard t.count == 10 else { return t }
-        return "\(t.prefix(2)) \(t.dropFirst(2).prefix(4)) \(t.suffix(4))"
     }
 }
 
