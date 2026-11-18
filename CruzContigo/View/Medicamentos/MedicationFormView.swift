@@ -1,57 +1,45 @@
 import SwiftUI
 import PhotosUI
-import UIKit
 
 /// Formulario para agregar o editar un tratamiento. La validación vive en `MedicationDraft`.
 struct MedicationFormView: View {
-    let recipientID: UUID
-    @ObservedObject var model: MedicationViewModel
-    var editing: Medication?
     @Environment(\.dismiss) private var dismiss
-
-    @State private var draft: MedicationDraft
-    @State private var isSaving = false
-    @State private var saveError: String?
-    @State private var recetaSelection: PhotosPickerItem?
-    @State private var recetaExtraida: RecetaExtraida?
-    @State private var isReadingReceta = false
-    @State private var recetaError: String?
-    @State private var recetaAplicada = false
-    @State private var recetaGuardada = false
+    @State private var viewModel: MedicationFormViewModel
 
     init(recipientID: UUID, model: MedicationViewModel, editing: Medication? = nil) {
-        self.recipientID = recipientID
-        self.model = model
-        self.editing = editing
-        _draft = State(initialValue: editing.map(MedicationDraft.init(medication:)) ?? MedicationDraft())
+        _viewModel = State(initialValue: MedicationFormViewModel(
+            recipientID: recipientID,
+            model: model,
+            editing: editing
+        ))
     }
 
     var body: some View {
         Form {
             if #available(iOS 27.0, *) {
                 Section("Leer receta") {
-                    PhotosPicker(selection: $recetaSelection, matching: .images) {
+                    PhotosPicker(selection: $viewModel.recetaSelection, matching: .images) {
                         Label("Seleccionar foto de receta", systemImage: "doc.viewfinder")
                     }
-                    .disabled(isReadingReceta || isSaving)
+                    .disabled(viewModel.isReadingReceta || viewModel.isSaving)
 
-                    if isReadingReceta {
+                    if viewModel.isReadingReceta {
                         ProgressView("Leyendo receta...")
                     }
 
-                    if recetaGuardada {
+                    if viewModel.recetaGuardada {
                         Label("Foto guardada en Información médica › Documentos.", systemImage: "checkmark.circle.fill")
                             .font(.app(.footnote))
                             .foregroundStyle(Color.textoSuave)
                     }
 
-                    if let recetaError {
+                    if let recetaError = viewModel.recetaError {
                         Text(recetaError)
                             .font(.app(.footnote))
                             .foregroundStyle(MedicalStyle.red)
                     }
 
-                    if let recetaExtraida {
+                    if let recetaExtraida = viewModel.recetaExtraida {
                         if recetaExtraida.medicamentos.isEmpty {
                             Text("No se detectaron medicamentos. Puedes capturarlos manualmente.")
                         } else {
@@ -64,7 +52,7 @@ struct MedicationFormView: View {
                                     .compactMap { $0 }
                                     .joined(separator: " ")
                                 Button {
-                                    aplicar(medicamento)
+                                    viewModel.aplicar(medicamento)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(medicamento.nombre)
@@ -83,127 +71,74 @@ struct MedicationFormView: View {
                         }
                     }
 
-                    if recetaAplicada {
+                    if viewModel.recetaAplicada {
                         Label("Formulario actualizado. Revisa y completa los datos antes de guardar.",
                               systemImage: "checkmark.circle.fill")
                             .font(.app(.footnote))
                             .foregroundStyle(Color.textoSuave)
                     }
                 }
-                .onChange(of: recetaSelection) { _, item in
+                .onChange(of: viewModel.recetaSelection) { _, item in
                     guard let item else { return }
-                    Task { await leerReceta(item) }
+                    Task { await viewModel.leerReceta(item) }
                 }
             }
 
             Section("Medicamento") {
-                TextField("Nombre del medicamento", text: $draft.name)
-                TextField("Presentación (opcional, ej. tableta)", text: $draft.presentation)
-                TextField("Dosis numérica (ej. 500 o 0,5)", text: $draft.dose)
+                TextField("Nombre del medicamento", text: $viewModel.draft.name)
+                TextField("Presentación (opcional, ej. tableta)", text: $viewModel.draft.presentation)
+                TextField("Dosis numérica (ej. 500 o 0,5)", text: $viewModel.draft.dose)
                     .keyboardType(.decimalPad)
-                TextField("Unidad (opcional, ej. mg o ml)", text: $draft.unit)
-                TextField("Frecuencia (opcional)", text: $draft.frequency)
+                TextField("Unidad (opcional, ej. mg o ml)", text: $viewModel.draft.unit)
+                TextField("Frecuencia (opcional)", text: $viewModel.draft.frequency)
                 Text("La dosis debe ser mayor que cero y tener como máximo dos decimales.")
                     .font(.app(.footnote)).foregroundStyle(Color.textoSuave)
             }
             Section("Fechas") {
-                DatePicker("Fecha de inicio", selection: $draft.startDate, displayedComponents: .date)
-                Toggle("Tiene fecha de fin", isOn: $draft.hasEndDate)
-                if draft.hasEndDate {
-                    DatePicker("Fecha de fin", selection: $draft.endDate,
-                               in: Calendar.current.startOfDay(for: draft.startDate)..., displayedComponents: .date)
+                DatePicker("Fecha de inicio", selection: $viewModel.draft.startDate, displayedComponents: .date)
+                Toggle("Tiene fecha de fin", isOn: $viewModel.draft.hasEndDate)
+                if viewModel.draft.hasEndDate {
+                    DatePicker("Fecha de fin", selection: $viewModel.draft.endDate,
+                               in: Calendar.current.startOfDay(for: viewModel.draft.startDate)..., displayedComponents: .date)
                 }
                 Text("Los tratamientos cuya fecha de fin ya pasó aparecen en Anteriores.")
                     .font(.app(.footnote)).foregroundStyle(Color.textoSuave)
             }
             Section("Información adicional") {
-                TextField("Indicación (opcional)", text: $draft.indication, axis: .vertical)
-                TextField("Existencias (opcional)", text: $draft.stock)
+                TextField("Indicación (opcional)", text: $viewModel.draft.indication, axis: .vertical)
+                TextField("Existencias (opcional)", text: $viewModel.draft.stock)
                     .keyboardType(.decimalPad)
-                Stepper("Umbral de resurtido: \(draft.refillThresholdDays) días",
-                        value: $draft.refillThresholdDays, in: 0...32767)
+                Stepper("Umbral de resurtido: \(viewModel.draft.refillThresholdDays) días",
+                        value: $viewModel.draft.refillThresholdDays, in: 0...32767)
             }
             Section {
                 Text("Registra únicamente indicaciones confirmadas por un profesional de salud. Esta app no calcula ni recomienda dosis.")
                     .font(.app(.footnote)).foregroundStyle(Color.textoSuave)
             }
         }
-        .navigationTitle(editing == nil ? "Agregar medicamento" : "Editar medicamento")
+        .navigationTitle(viewModel.editing == nil ? "Agregar medicamento" : "Editar medicamento")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancelar") { dismiss() }
-                    .disabled(isSaving || isReadingReceta)
+                    .disabled(viewModel.isSaving || viewModel.isReadingReceta)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar") {
-                    let medication = draft.medication(id: editing?.id ?? UUID(), recipientID: recipientID)
-                    isSaving = true
                     Task {
-                        let error = await model.save(medication, updating: editing != nil)
-                        isSaving = false
-                        if let error {
-                            saveError = error
-                        } else {
-                            dismiss()
-                        }
+                        if await viewModel.guardar() { dismiss() }
                     }
                 }
-                .disabled(!draft.isValid || isSaving || isReadingReceta)
+                .disabled(!viewModel.draft.isValid || viewModel.isSaving || viewModel.isReadingReceta)
             }
         }
-        .interactiveDismissDisabled(isSaving || isReadingReceta)
+        .interactiveDismissDisabled(viewModel.isSaving || viewModel.isReadingReceta)
         .alert("No se pudo guardar", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
+            get: { viewModel.saveError != nil },
+            set: { if !$0 { viewModel.saveError = nil } }
         )) {
-            Button("Aceptar", role: .cancel) { saveError = nil }
-        } message: { Text(saveError ?? "") }
+            Button("Aceptar", role: .cancel) { viewModel.saveError = nil }
+        } message: { Text(viewModel.saveError ?? "") }
         .tint(MedicalStyle.red)
-    }
-
-    @available(iOS 27.0, *)
-    private func leerReceta(_ item: PhotosPickerItem) async {
-        isReadingReceta = true
-        recetaError = nil
-        recetaExtraida = nil
-        recetaAplicada = false
-        recetaGuardada = false
-        defer {
-            isReadingReceta = false
-            recetaSelection = nil
-        }
-
-        do {
-            guard let data = try await item.loadTransferable(type: Data.self),
-                  let imagen = UIImage(data: data) else {
-                throw RecetaExtractorError.imagenInvalida
-            }
-            guard let archivo = imagen.jpegData(compressionQuality: 0.9) else {
-                throw RecetaExtractorError.imagenInvalida
-            }
-            try DocumentosMedicosRepository.guardar(
-                archivo,
-                titulo: "Receta médica",
-                extensionArchivo: "jpg",
-                tipo: .receta,
-                familiarID: recipientID
-            )
-            recetaGuardada = true
-            let receta = try await RecetaExtractor().extraer(desde: imagen)
-            if receta.medicamentos.count == 1, let medicamento = receta.medicamentos.first {
-                aplicar(medicamento)
-            } else {
-                recetaExtraida = receta
-            }
-        } catch {
-            recetaError = "No se pudo leer la receta: \(error.localizedDescription)"
-        }
-    }
-
-    private func aplicar(_ medicamento: MedicamentoExtraido) {
-        draft.aplicar(medicamento)
-        recetaExtraida = nil
-        recetaAplicada = true
     }
 }

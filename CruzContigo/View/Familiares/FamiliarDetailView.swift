@@ -10,6 +10,7 @@ struct FamiliarDetailView: View {
 
     @Environment(FamiliaresStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @State private var viewModel = FamiliarDetailViewModel()
     @State private var confirmarEliminar = false
     @State private var editando = false
 
@@ -60,8 +61,7 @@ struct FamiliarDetailView: View {
             Button("Eliminar perfil", role: .destructive) {
                 guard let familiar else { return }
                 Task {
-                    await store.eliminar(familiar)
-                    dismiss()
+                    await viewModel.eliminar(familiar, usando: store) { dismiss() }
                 }
             }
         } message: {
@@ -100,7 +100,7 @@ struct FamiliarDetailView: View {
                      valor: "\(familiar.fechaNacimiento.formatted(.dateTime.day().month(.wide).year().locale(Locale(identifier: "es_MX")))) · \(familiar.edad) años")
             Divider().padding(.leading, 52)
             FilaDato(icono: "phone.fill", titulo: "Teléfono",
-                     valor: familiar.telefono.map(formatearTelefono) ?? "Sin registrar")
+                     valor: familiar.telefono.map(viewModel.formatearTelefono) ?? "Sin registrar")
             if let notas = familiar.notas {
                 Divider().padding(.leading, 52)
                 FilaDato(icono: "note.text", titulo: "Notas", valor: notas)
@@ -139,12 +139,6 @@ struct FamiliarDetailView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
         }
-    }
-
-    private func formatearTelefono(_ t: String) -> String {
-        guard t.count == 10 else { return t }
-        let a = t.prefix(2), b = t.dropFirst(2).prefix(4), c = t.suffix(4)
-        return "\(a) \(b) \(c)"
     }
 }
 
