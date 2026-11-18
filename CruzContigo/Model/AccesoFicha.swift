@@ -95,6 +95,8 @@ struct SolicitudAcceso: Codable, Equatable {
 struct RegistroConsentimiento: Codable, Identifiable, Hashable {
     enum Accion: String, Codable {
         case autorizar, revocar
+        case compartirQR = "compartir_qr"
+        case retirarQR = "retirar_qr"
     }
 
     struct Persona: Codable, Hashable {
@@ -119,8 +121,23 @@ struct RegistroConsentimiento: Codable, Identifiable, Hashable {
         switch accion {
         case .autorizar: "\(otorgadoPor.visible) autorizó a \(usuario.visible) como \(rol.titulo.lowercased())"
         case .revocar: "\(otorgadoPor.visible) retiró el acceso de \(usuario.visible)"
+        case .compartirQR: "\(otorgadoPor.visible) permitió el código QR de emergencia"
+        case .retirarQR: "\(otorgadoPor.visible) retiró el código QR de emergencia"
         }
     }
+}
+
+/// HU-19: si la persona titular permite mostrar su ficha de emergencia como código QR.
+struct EstadoQR: Codable, Equatable {
+    let consentido: Bool
+    let fecha: Date?
+    let versionAviso: String
+}
+
+struct SolicitudQR: Codable, Equatable {
+    let consentido: Bool
+    var versionAviso: String? = nil
+    var aceptaAviso: Bool? = nil
 }
 
 /// Texto que la persona acepta al compartir datos médicos. Si cambia, sube la versión

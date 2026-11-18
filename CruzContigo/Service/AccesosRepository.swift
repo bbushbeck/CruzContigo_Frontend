@@ -10,6 +10,8 @@ protocol AccesosRepository {
     func autorizar(_ solicitud: SolicitudAcceso, familiarID: UUID) async throws -> MiembroAcceso
     func revocar(miembroID: UUID, familiarID: UUID) async throws
     func consentimientos(familiarID: UUID) async throws -> [RegistroConsentimiento]
+    func estadoQR(familiarID: UUID) async throws -> EstadoQR
+    func cambiarQR(_ solicitud: SolicitudQR, familiarID: UUID) async throws -> EstadoQR
 }
 
 struct RemoteAccesosRepository: AccesosRepository {
@@ -31,6 +33,14 @@ struct RemoteAccesosRepository: AccesosRepository {
         try await api.get("\(ruta(familiarID))/consentimientos")
     }
 
+    func estadoQR(familiarID: UUID) async throws -> EstadoQR {
+        try await api.get("\(ruta(familiarID))/qr")
+    }
+
+    func cambiarQR(_ solicitud: SolicitudQR, familiarID: UUID) async throws -> EstadoQR {
+        try await api.put("\(ruta(familiarID))/qr", cuerpo: solicitud)
+    }
+
     private func ruta(_ id: UUID) -> String { "familiares/\(id.uuidString)/accesos" }
 }
 
@@ -42,6 +52,8 @@ struct SinConexionAccesosRepository: AccesosRepository {
     func autorizar(_ solicitud: SolicitudAcceso, familiarID: UUID) async throws -> MiembroAcceso { throw error }
     func revocar(miembroID: UUID, familiarID: UUID) async throws { throw error }
     func consentimientos(familiarID: UUID) async throws -> [RegistroConsentimiento] { throw error }
+    func estadoQR(familiarID: UUID) async throws -> EstadoQR { throw error }
+    func cambiarQR(_ solicitud: SolicitudQR, familiarID: UUID) async throws -> EstadoQR { throw error }
 }
 
 extension Repositorios {

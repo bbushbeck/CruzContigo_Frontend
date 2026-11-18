@@ -54,6 +54,7 @@ final class AuthViewModel {
             try? await service.cerrarSesion(token: token)
         }
         tokens.eliminar()
+        FichasEmergenciaGuardadas.eliminarTodas()
         estaAutenticado = false
         cambiarNumero()
     }

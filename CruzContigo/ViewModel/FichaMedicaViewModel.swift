@@ -60,6 +60,7 @@ final class FichaMedicaViewModel {
     /// Sin permiso no se conservan en memoria los datos que ya se habían descargado.
     private func perderAcceso(_ mensaje: String) {
         ficha = nil
+        FichasEmergenciaGuardadas.eliminar(familiarID)
         estado = .sinAcceso(mensaje)
     }
 }

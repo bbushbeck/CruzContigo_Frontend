@@ -24,6 +24,14 @@ struct AccesosFichaTests {
         }
 
         func consentimientos(familiarID: UUID) async throws -> [RegistroConsentimiento] { [] }
+
+        func estadoQR(familiarID: UUID) async throws -> EstadoQR {
+            EstadoQR(consentido: false, fecha: nil, versionAviso: AvisoPrivacidad.version)
+        }
+
+        func cambiarQR(_ solicitud: SolicitudQR, familiarID: UUID) async throws -> EstadoQR {
+            EstadoQR(consentido: solicitud.consentido, fecha: Date(), versionAviso: AvisoPrivacidad.version)
+        }
     }
 
     static func miembro(rol: RolAcceso, esTuCuenta: Bool = false) -> MiembroAcceso {
