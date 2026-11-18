@@ -13,6 +13,7 @@ struct FichaMedicaView: View {
     @State private var viewModel: FichaMedicaViewModel
     @State private var editando = false
     @State private var mostrandoDocumentos = false
+    @State private var gestionandoAccesos = false
 
     init(familiarID: UUID) {
         self.familiarID = familiarID
@@ -40,6 +41,8 @@ struct FichaMedicaView: View {
                     Task { await viewModel.cargar() }
                 }
                 Spacer()
+            case .sinAcceso(let mensaje):
+                sinAcceso(mensaje)
             case .sinFicha:
                 sinFicha
             case .lista:
@@ -57,12 +60,36 @@ struct FichaMedicaView: View {
         .sheet(isPresented: $mostrandoDocumentos) {
             DocumentosMedicosView(familiarID: familiarID, puedeEditar: familiar?.puedeEditar ?? false)
         }
+        .sheet(isPresented: $gestionandoAccesos) {
+            AccesosFichaView(familiarID: familiarID, nombre: familiar?.nombre ?? "")
+        }
+    }
+
+    private var puedeVerDocumentos: Bool { familiar?.esProfesional != true }
+
+    private var muestraAccesos: Bool {
+        guard familiar?.puedeGestionarAccesos == true, AppConfig.apiBaseURL != nil else { return false }
+        return viewModel.estado == .lista || viewModel.estado == .sinFicha
     }
 
     private var header: some View {
         HStack {
             BrandBackButton { dismiss() }
             Spacer()
+            if muestraAccesos {
+                Button {
+                    gestionandoAccesos = true
+                } label: {
+                    Label("Accesos", systemImage: "person.badge.key.fill")
+                        .font(.app(.subheadline).weight(.bold))
+                        .foregroundColor(.brandRed)
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .background(Color.tintaSuave)
+                        .cornerRadius(12)
+                }
+                .accessibilityHint("Autoriza o retira quién puede ver esta ficha")
+            }
             if viewModel.estado == .lista, familiar?.puedeEditar == true {
                 Button {
                     editando = true
@@ -119,9 +146,11 @@ struct FichaMedicaView: View {
                 if familiar?.puedeEditar == true {
                     PrimaryButton(title: "Crear ficha médica") { editando = true }
                 }
-                Button("Ver documentos médicos") { mostrandoDocumentos = true }
-                    .font(.app(.headline))
-                    .frame(minHeight: 44)
+                if puedeVerDocumentos {
+                    Button("Ver documentos médicos") { mostrandoDocumentos = true }
+                        .font(.app(.headline))
+                        .frame(minHeight: 44)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
@@ -132,6 +161,9 @@ struct FichaMedicaView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 titulo
+                if familiar?.esProfesional == true {
+                    avisoProfesional
+                }
                 tarjetaSangre(ficha)
 
                 SeccionFicha(titulo: "Alergias", icono: "allergens", vacio: "Sin alergias registradas") {
@@ -183,13 +215,15 @@ struct FichaMedicaView: View {
                     } esVacio: { false }
                 }
 
-                Button { mostrandoDocumentos = true } label: {
-                    Label("Documentos médicos", systemImage: "folder.fill")
-                        .font(.app(.headline))
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
+                if puedeVerDocumentos {
+                    Button { mostrandoDocumentos = true } label: {
+                        Label("Documentos médicos", systemImage: "folder.fill")
+                            .font(.app(.headline))
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
+                    }
+                    .accessibilityHint("Abre las fotos de recetas, estudios y archivos PDF")
                 }
-                .accessibilityHint("Abre las fotos de recetas, estudios y archivos PDF")
 
                 Text("Actualizada el \(ficha.ultimaActualizacion.formatted(date: .long, time: .shortened))")
                     .font(.app(.footnote))
@@ -200,6 +234,44 @@ struct FichaMedicaView: View {
             .padding(.top, 16)
             .padding(.bottom, 32)
         }
+    }
+
+    private var avisoProfesional: some View {
+        Label {
+            Text("Acceso profesional de solo lectura. Esta consulta queda registrada y la persona titular puede verla.")
+        } icon: {
+            Image(systemName: "stethoscope")
+        }
+        .font(.app(.footnote))
+        .foregroundColor(.textoSuave)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.tintaSuave))
+    }
+
+    private func sinAcceso(_ mensaje: String) -> some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "lock.fill")
+                .icono(.destacado)
+                .foregroundColor(.brandRed)
+                .accessibilityHidden(true)
+            Text("Ya no tienes acceso a esta ficha")
+                .font(.app(.headline))
+            Text(mensaje)
+                .font(.app(.subheadline))
+                .foregroundColor(.textoSuave)
+                .multilineTextAlignment(.center)
+            Spacer()
+            PrimaryButton(title: "Volver") {
+                Task {
+                    await store.cargar()
+                    dismiss()
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 32)
     }
 
     private func tarjetaSangre(_ ficha: FichaMedica) -> some View {

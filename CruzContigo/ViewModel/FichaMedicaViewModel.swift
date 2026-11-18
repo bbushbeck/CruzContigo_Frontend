@@ -10,6 +10,8 @@ import Observation
 final class FichaMedicaViewModel {
     enum Estado: Equatable {
         case cargando, sinFicha, lista, error(String)
+        /// El servidor respondió 403: el acceso fue retirado o venció.
+        case sinAcceso(String)
     }
 
     let familiarID: UUID
@@ -28,6 +30,8 @@ final class FichaMedicaViewModel {
         do {
             ficha = try await repositorio.obtener(familiarID: familiarID)
             estado = ficha == nil ? .sinFicha : .lista
+        } catch APIError.sinAcceso(let mensaje) {
+            perderAcceso(mensaje)
         } catch {
             estado = .error(error.localizedDescription)
         }
@@ -45,8 +49,17 @@ final class FichaMedicaViewModel {
             self.ficha = try await repositorio.guardar(ficha)
             estado = .lista
             return nil
+        } catch APIError.sinAcceso(let mensaje) {
+            perderAcceso(mensaje)
+            return mensaje
         } catch {
             return error.localizedDescription
         }
+    }
+
+    /// Sin permiso no se conservan en memoria los datos que ya se habían descargado.
+    private func perderAcceso(_ mensaje: String) {
+        ficha = nil
+        estado = .sinAcceso(mensaje)
     }
 }

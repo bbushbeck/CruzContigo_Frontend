@@ -36,7 +36,9 @@ struct FamiliarDetailView: View {
                         perfil(familiar)
                         datos(familiar)
                         modulos(familiar)
-                        eliminarBoton
+                        if !familiar.esProfesional {
+                            eliminarBoton
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
@@ -117,7 +119,7 @@ struct FamiliarDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             SeccionHeader(titulo: "Su cuidado")
             VStack(spacing: 0) {
-                ForEach(Array(Modulo.delPerfil.enumerated()), id: \.element) { indice, modulo in
+                ForEach(Array(familiar.modulosVisibles.enumerated()), id: \.element) { indice, modulo in
                     if indice > 0 { Divider().padding(.leading, 72) }
                     NavigationLink(value: Ruta.modulo(modulo, familiarID: familiar.id)) {
                         ModuloFila(modulo: modulo)
