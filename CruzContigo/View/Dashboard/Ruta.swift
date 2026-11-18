@@ -52,7 +52,7 @@ struct ModuloDestino: View {
             }
 
         case .medicamentos:
-            let recipients = store.familiares.map(CareRecipient.init(familiar:))
+            let recipients = store.familiares.map { CareRecipient(familiar: $0) }
             MedicationsView(
                 recipients: recipients,
                 selectedRecipient: recipients.first { $0.id == familiarID },

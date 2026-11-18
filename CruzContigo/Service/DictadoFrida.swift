@@ -73,8 +73,9 @@ final class DictadoFrida {
                 let texto = resultado?.bestTranscription.formattedString
                 let final = resultado?.isFinal == true
                 let fallo = error != nil
+                guard let self else { return }
                 Task { @MainActor in
-                    self?.recibir(texto: texto, final: final, fallo: fallo, id: id)
+                    self.recibir(texto: texto, final: final, fallo: fallo, id: id)
                 }
             }
             Self.instalarTap(en: entrada, formato: formato, solicitud: solicitud)

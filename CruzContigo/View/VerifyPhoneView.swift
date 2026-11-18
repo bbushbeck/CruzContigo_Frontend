@@ -14,6 +14,16 @@ struct VerifyPhoneView: View {
     @FocusState private var telefonoEnfocado: Bool
     private let codeLength = 6
 
+    /// Mensaje con el número en negrita, sin usar el operador `+` de `Text` (deprecado).
+    private var mensajeCodigo: AttributedString {
+        var mensaje = AttributedString("Te enviamos un código de 6 dígitos al ")
+        var numero = AttributedString(viewModel.telefono)
+        numero.font = .app(.body).weight(.bold)
+        numero.foregroundColor = .primary
+        mensaje.append(numero)
+        return mensaje
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -55,11 +65,8 @@ struct VerifyPhoneView: View {
 
             Group {
                 if viewModel.esperandoCodigo {
-                    Text("Te enviamos un código de 6 dígitos al ")
+                    Text(mensajeCodigo)
                         .foregroundColor(.textoSuave)
-                    + Text(viewModel.telefono)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
                 } else {
                     Text("Te enviaremos un código para confirmar tu identidad.")
                         .foregroundColor(.textoSuave)

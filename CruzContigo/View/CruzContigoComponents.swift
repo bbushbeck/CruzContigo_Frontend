@@ -48,10 +48,14 @@ struct BrandLogoView: View {
                 .accessibilityHidden(true)
                 .padding(.bottom, 8)
 
-            Text("Cruz").font(.app(.title)).fontWeight(.bold)
-            + Text("Contigo")
-                .font(.app(.title)).fontWeight(.bold)
-                .foregroundColor(.brandRed)
+            HStack(spacing: 0) {
+                Text("Cruz")
+                Text("Contigo")
+                    .foregroundColor(.brandRed)
+            }
+            .font(.app(.title))
+            .fontWeight(.bold)
+            .accessibilityElement(children: .combine)
 
             Text("Cuidar es estar juntos")
                 .font(.app(.subheadline))

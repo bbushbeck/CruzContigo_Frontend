@@ -17,7 +17,7 @@ struct MedicationDraft: Equatable {
 
     init() {}
 
-    init(medication: Medication) {
+    nonisolated init(medication: Medication) {
         name = medication.name
         presentation = medication.presentation ?? ""
         dose = medication.dose

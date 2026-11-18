@@ -21,8 +21,8 @@ final class RedCuidadoViewModel {
 
     private let repositorio: RedCuidadoRepository
 
-    init(repositorio: RedCuidadoRepository = Repositorios.redCuidado()) {
-        self.repositorio = repositorio
+    init(repositorio: RedCuidadoRepository? = nil) {
+        self.repositorio = repositorio ?? Repositorios.redCuidado()
     }
 
     func cargarRecibidas() async {

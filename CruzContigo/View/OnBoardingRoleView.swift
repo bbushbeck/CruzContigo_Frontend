@@ -102,10 +102,14 @@ struct OnboardingRoleView: View {
 struct CompactBrandHeader: View {
     var body: some View {
         VStack(spacing: 2) {
-            Text("Cruz").font(.app(.title2)).fontWeight(.bold)
-            + Text("Contigo")
-                .font(.app(.title2)).fontWeight(.bold)
-                .foregroundColor(.brandRed)
+            HStack(spacing: 0) {
+                Text("Cruz")
+                Text("Contigo")
+                    .foregroundColor(.brandRed)
+            }
+            .font(.app(.title2))
+            .fontWeight(.bold)
+            .accessibilityElement(children: .combine)
 
             Text("Cuidar es estar juntos")
                 .font(.app(.footnote))

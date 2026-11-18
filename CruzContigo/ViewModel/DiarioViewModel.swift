@@ -26,9 +26,9 @@ final class DiarioViewModel {
     let familiarID: UUID
     private let repositorio: DiarioRepository
 
-    init(familiarID: UUID, repositorio: DiarioRepository = Repositorios.diario()) {
+    init(familiarID: UUID, repositorio: DiarioRepository? = nil) {
         self.familiarID = familiarID
-        self.repositorio = repositorio
+        self.repositorio = repositorio ?? Repositorios.diario()
     }
 
     /// Notas agrupadas por día, del más reciente al más antiguo.

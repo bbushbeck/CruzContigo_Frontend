@@ -41,7 +41,7 @@ extension CareRecipient {
         self.init(id: familiar.id, name: familiar.nombreCompleto, age: familiar.edad)
     }
 
-    static let maria = CareRecipient(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, name: "María López", age: 72)
-    static let jose = CareRecipient(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, name: "José Torres", age: 68)
-    static let examples = [maria, jose]
+    nonisolated static let maria = CareRecipient(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, name: "María López", age: 72)
+    nonisolated static let jose = CareRecipient(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, name: "José Torres", age: 68)
+    nonisolated static let examples = [maria, jose]
 }
