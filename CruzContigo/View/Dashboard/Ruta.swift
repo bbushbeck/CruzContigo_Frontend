@@ -66,6 +66,9 @@ struct ModuloDestino: View {
                 ModuloPendienteView(modulo: modulo, familiarID: nil)
             }
 
+        case .redCuidado:
+            RedCuidadoView(familiarID: familiarID)
+
         case .citas, .recordatorios:
             RecordatoriosView(familiarID: familiarID)
 

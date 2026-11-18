@@ -311,6 +311,7 @@
 				DEVELOPMENT_TEAM = T3M2UVT4LZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CruzContigo-Info.plist";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Frida usa el micrófono cuando dictas una consulta.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Frida convierte tu voz en texto para consultar medicamentos y recordatorios.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -345,6 +346,7 @@
 				DEVELOPMENT_TEAM = T3M2UVT4LZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CruzContigo-Info.plist";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Frida usa el micrófono cuando dictas una consulta.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Frida convierte tu voz en texto para consultar medicamentos y recordatorios.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

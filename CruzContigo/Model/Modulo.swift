@@ -78,6 +78,6 @@ enum Modulo: String, CaseIterable, Identifiable, Hashable {
     var disponible: Bool { Self.disponibles.contains(self) }
 
     static let accesosRapidos: [Modulo] = [.fichaMedica, .medicamentos, .recordatorios]
-    static let delPerfil: [Modulo] = [.fichaMedica, .medicamentos, .recordatorios, .citas, .diario, .emergencia]
+    static let delPerfil: [Modulo] = [.fichaMedica, .medicamentos, .recordatorios, .citas, .diario, .emergencia, .redCuidado]
     static let generales: [Modulo] = [.accesibilidad, .redCuidado, .comunidad, .bienestar, .ayuda]
 }

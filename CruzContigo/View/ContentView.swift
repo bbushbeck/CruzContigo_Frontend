@@ -6,6 +6,14 @@ struct ContentView: View {
     @State private var auth = AuthViewModel()
     @State private var familiaresStore = FamiliaresStore()
     @State private var preferencias = Preferencias.compartidas
+    /// Código recibido por enlace `cruzcontigo://invitacion/CODIGO` (HU-17). Si aún no hay
+    /// sesión, se conserva y se muestra al terminar de entrar.
+    @State private var enlaceInvitacion: EnlaceInvitacion?
+
+    struct EnlaceInvitacion: Identifiable {
+        let id = UUID()
+        let codigo: String
+    }
 
     var body: some View {
         Group {
@@ -20,6 +28,17 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
             }
+        }
+        .onOpenURL { url in
+            if let codigo = CodigoInvitacion.desdeEnlace(url) {
+                enlaceInvitacion = EnlaceInvitacion(codigo: codigo)
+            }
+        }
+        .sheet(item: Binding(
+            get: { auth.estaAutenticado && onboardingCompletado ? enlaceInvitacion : nil },
+            set: { enlaceInvitacion = $0 }
+        )) { enlace in
+            AceptarInvitacionView(codigoInicial: enlace.codigo)
         }
         .environment(auth)
         .environment(familiaresStore)
