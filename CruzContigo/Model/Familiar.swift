@@ -76,6 +76,10 @@ struct Familiar: Codable, Identifiable, Hashable {
     var notas: String?
     var fechaRegistro: Date = Date()
     var rol: String? = nil
+    /// HU-17: un acceso temporal vence solo en esta fecha.
+    var accesoVenceEn: Date? = nil
+    /// HU-26: si un acceso temporal incluye la ficha médica.
+    var permisoFicha: Bool? = nil
 
     var nombreCompleto: String { "\(nombre) \(apellidos)" }
     var puedeEditar: Bool {
@@ -92,7 +96,26 @@ struct Familiar: Codable, Identifiable, Hashable {
         rol == RolAcceso.titular.rawValue || rol == RolAcceso.administrador.rawValue
     }
 
-    var modulosVisibles: [Modulo] { esProfesional ? [.fichaMedica] : Modulo.delPerfil }
+    /// Cuidador contratado o de apoyo con fecha de vencimiento (HU-26).
+    var esTemporal: Bool { rol == RolAcceso.temporal.rawValue }
+
+    /// La red (quién más cuida) no se muestra a accesos temporales ni profesionales.
+    var veRedDeCuidado: Bool { !esTemporal && !esProfesional }
+
+    var puedeEscribirDiario: Bool {
+        guard let rol else { return true }
+        return ["titular", "administrador", "cocuidador", "temporal"].contains(rol)
+    }
+
+    /// El invitado solo ve lo que su rol permite (HU-17). El servidor aplica lo mismo.
+    var modulosVisibles: [Modulo] {
+        if esProfesional { return [.fichaMedica] }
+        if esTemporal {
+            let ficha: [Modulo] = permisoFicha == true ? [.fichaMedica, .emergencia] : []
+            return ficha + [.recordatorios, .citas, .diario]
+        }
+        return Modulo.delPerfil
+    }
 
     var iniciales: String {
         let n = nombre.first.map(String.init) ?? ""

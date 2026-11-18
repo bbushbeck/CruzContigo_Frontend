@@ -6,7 +6,7 @@
 import Foundation
 
 enum Modulo: String, CaseIterable, Identifiable, Hashable {
-    case fichaMedica, medicamentos, recordatorios, citas, emergencia, redCuidado, comunidad, bienestar, ayuda, accesibilidad
+    case fichaMedica, medicamentos, recordatorios, citas, diario, emergencia, redCuidado, comunidad, bienestar, ayuda, accesibilidad
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ enum Modulo: String, CaseIterable, Identifiable, Hashable {
         case .medicamentos: "Medicamentos"
         case .recordatorios: "Recordatorios"
         case .citas: "Citas médicas"
+        case .diario: "Diario de cuidado"
         case .emergencia: "Ficha de emergencia"
         case .redCuidado: "Red de cuidado"
         case .comunidad: "Avisos de Cruz Roja"
@@ -31,6 +32,7 @@ enum Modulo: String, CaseIterable, Identifiable, Hashable {
         case .medicamentos: "Tratamientos y registro de tomas"
         case .recordatorios: "Avisos de tomas y pendientes"
         case .citas: "Agenda y notas de cada consulta"
+        case .diario: "Comida, sueño, ánimo e incidencias"
         case .emergencia: "Resumen disponible sin conexión"
         case .redCuidado: "Invita a otras personas a cuidar contigo"
         case .comunidad: "Campañas, cursos y comunicados"
@@ -46,6 +48,7 @@ enum Modulo: String, CaseIterable, Identifiable, Hashable {
         case .medicamentos: "pills.fill"
         case .recordatorios: "bell.fill"
         case .citas: "calendar"
+        case .diario: "book.closed.fill"
         case .emergencia: "staroflife.fill"
         case .redCuidado: "person.3.fill"
         case .comunidad: "megaphone.fill"
@@ -59,22 +62,22 @@ enum Modulo: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .redCuidado, .accesibilidad: 1
         case .fichaMedica, .medicamentos, .recordatorios, .citas: 2
-        case .emergencia, .comunidad, .bienestar, .ayuda: 3
+        case .diario, .emergencia, .comunidad, .bienestar, .ayuda: 3
         }
     }
 
     var esPorFamiliar: Bool {
         switch self {
-        case .fichaMedica, .medicamentos, .recordatorios, .citas, .emergencia: true
+        case .fichaMedica, .medicamentos, .recordatorios, .citas, .diario, .emergencia: true
         default: false
         }
     }
 
-    static let disponibles: Set<Modulo> = [.fichaMedica, .medicamentos, .recordatorios, .citas, .emergencia, .accesibilidad]
+    static let disponibles: Set<Modulo> = [.fichaMedica, .medicamentos, .recordatorios, .citas, .diario, .emergencia, .redCuidado, .accesibilidad]
 
     var disponible: Bool { Self.disponibles.contains(self) }
 
     static let accesosRapidos: [Modulo] = [.fichaMedica, .medicamentos, .recordatorios]
-    static let delPerfil: [Modulo] = [.fichaMedica, .medicamentos, .recordatorios, .citas, .emergencia]
+    static let delPerfil: [Modulo] = [.fichaMedica, .medicamentos, .recordatorios, .citas, .diario, .emergencia]
     static let generales: [Modulo] = [.accesibilidad, .redCuidado, .comunidad, .bienestar, .ayuda]
 }

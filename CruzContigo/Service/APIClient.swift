@@ -62,6 +62,11 @@ struct APIClient {
         try await enviar(path, metodo: "GET", cuerpo: Optional<Int>.none)
     }
 
+    /// GET con parámetros de consulta (`?clave=valor`), que no se pueden poner en `path`.
+    func get<T: Decodable>(_ path: String, consulta: [URLQueryItem]) async throws -> T {
+        try await enviar(path, metodo: "GET", cuerpo: Optional<Int>.none, consulta: consulta)
+    }
+
     func post<B: Encodable, T: Decodable>(_ path: String, cuerpo: B) async throws -> T {
         try await enviar(path, metodo: "POST", cuerpo: cuerpo)
     }
@@ -74,8 +79,8 @@ struct APIClient {
         _ = try await ejecutar(path, metodo: "DELETE", cuerpo: Optional<Int>.none)
     }
 
-    private func enviar<B: Encodable, T: Decodable>(_ path: String, metodo: String, cuerpo: B?) async throws -> T {
-        let datos = try await ejecutar(path, metodo: metodo, cuerpo: cuerpo)
+    private func enviar<B: Encodable, T: Decodable>(_ path: String, metodo: String, cuerpo: B?, consulta: [URLQueryItem] = []) async throws -> T {
+        let datos = try await ejecutar(path, metodo: metodo, cuerpo: cuerpo, consulta: consulta)
         do {
             return try Self.decoder.decode(T.self, from: datos)
         } catch {
@@ -83,8 +88,10 @@ struct APIClient {
         }
     }
 
-    private func ejecutar<B: Encodable>(_ path: String, metodo: String, cuerpo: B?) async throws -> Data {
-        var request = URLRequest(url: baseURL.appending(path: path))
+    private func ejecutar<B: Encodable>(_ path: String, metodo: String, cuerpo: B?, consulta: [URLQueryItem] = []) async throws -> Data {
+        var url = baseURL.appending(path: path)
+        if !consulta.isEmpty { url.append(queryItems: consulta) }
+        var request = URLRequest(url: url)
         request.httpMethod = metodo
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token = token ?? AuthTokenStore.shared.cargar() {

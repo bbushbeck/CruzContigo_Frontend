@@ -28,15 +28,17 @@ enum RolAcceso: String, Codable, CaseIterable, Identifiable {
     var descripcion: String {
         switch self {
         case .titular: "Dueña de la información médica."
-        case .administrador: "Administra el perfil y sus accesos."
+        case .administrador: "Edita toda la información y administra el perfil, igual que tú."
         case .cocuidador: "Consulta y edita la ficha, los medicamentos y los recordatorios."
         case .soloLectura: "Consulta la información sin poder cambiarla."
-        case .temporal: "Acceso con vencimiento a tareas y recordatorios."
+        case .temporal: "Para un cuidador de apoyo: ve recordatorios, contactos de emergencia y el diario hasta la fecha que elijas. No ve la ficha médica salvo que lo permitas."
         case .profesional: "Consulta solo la ficha médica por tiempo limitado. Su institución debe tener convenio con Cruz Roja y cada consulta queda registrada."
         }
     }
 
     static let autorizables: [RolAcceso] = [.cocuidador, .soloLectura, .profesional]
+    /// Roles con los que se invita a la red de cuidado (HU-17).
+    static let invitables: [RolAcceso] = [.cocuidador, .soloLectura, .temporal, .administrador]
 }
 
 enum EstadoAcceso: String, Codable {
@@ -52,6 +54,7 @@ struct MiembroAcceso: Codable, Identifiable, Hashable {
     let estado: EstadoAcceso
     let venceEn: Date?
     let esTuCuenta: Bool
+    var permisoFicha: Bool? = nil
 
     var nombreVisible: String {
         if let nombre, !nombre.isEmpty { return nombre }
