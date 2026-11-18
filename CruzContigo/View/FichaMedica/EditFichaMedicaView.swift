@@ -2,6 +2,9 @@
 //  EditFichaMedicaView.swift
 //  CruzContigo
 //
+//  Una pregunta por pantalla. Lo esencial para una emergencia va primero
+//  y los detalles opcionales al final.
+//
 
 import SwiftUI
 
@@ -10,102 +13,46 @@ struct EditFichaMedicaView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: EditFichaMedicaViewModel
+    @State private var confirmarSalida = false
 
     init(ficha: FichaMedica, nombre: String, onGuardar: @escaping (FichaMedica) async -> String?) {
         self.nombre = nombre
         _viewModel = State(initialValue: EditFichaMedicaViewModel(ficha: ficha, onGuardar: onGuardar))
     }
 
+    private var persona: String { nombre.isEmpty ? "esta persona" : nombre }
+    private var tiene: String { nombre.isEmpty ? "Tiene" : nombre + " tiene" }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Button("Cancelar") { dismiss() }
-                    .foregroundColor(.brandRed)
-                Spacer()
-                Text("Ficha médica").font(.app(.headline))
-                Spacer()
-                Button("Cancelar") {}.hidden()
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+            encabezado
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(nombre.isEmpty ? "Datos médicos" : "Datos médicos de \(nombre)")
-                            .font(.app(.title).weight(.bold))
-                        Text("Usa datos ficticios durante las pruebas.")
-                            .font(.app(.footnote))
-                            .foregroundColor(.textoSuave)
-                    }
-
-                    FormFieldContainer(
-                        titulo: "Tipo sanguíneo",
-                        obligatorio: true,
-                        error: viewModel.intentoGuardar && viewModel.ficha.tipoSanguineo == nil ? "Selecciona una opción." : nil
-                    ) {
-                        ChipSelector(
-                            opciones: TipoSanguineo.allCases,
-                            seleccion: $viewModel.ficha.tipoSanguineo,
-                            titulo: \.titulo
-                        )
-                    }
-
-                    seccionAlergias
-                    seccionEnfermedades
-
-                    FormFieldContainer(titulo: "Antecedentes (opcional)") {
-                        TextField("Antecedentes familiares o médicos", text: $viewModel.antecedentes, axis: .vertical)
-                            .lineLimit(3...6)
-                            .padding(16)
-                            .fieldBorder(false)
-                    }
-
-                    FormFieldContainer(titulo: "Médico tratante (opcional)") {
-                        TextField("Nombre del médico", text: $viewModel.medicoTratante)
-                            .padding(16)
-                            .fieldBorder(false)
-                    }
-
-                    FormFieldContainer(titulo: "Institución de salud (opcional)") {
-                        TextField("Ej. IMSS, ISSSTE", text: $viewModel.institucionSalud)
-                            .padding(16)
-                            .fieldBorder(false)
-                    }
-
-                    FormFieldContainer(titulo: "Observaciones (opcional)") {
-                        TextField("Ej. Marcapasos, usa lentes, dieta baja en sodio", text: $viewModel.observaciones, axis: .vertical)
-                            .lineLimit(3...6)
-                            .padding(16)
-                            .fieldBorder(false)
+                    switch viewModel.paso {
+                    case .sangre: pasoSangre
+                    case .alergias: pasoAlergias
+                    case .enfermedades: pasoEnfermedades
+                    case .detalles: pasoDetalles
                     }
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollDismissesKeyboard(.interactively)
+            .id(viewModel.paso)
 
-            VStack(spacing: 10) {
-                if viewModel.intentoGuardar, let primerError = viewModel.fichaFinal.errores.first {
-                    Text(primerError)
-                        .font(.app(.footnote))
-                        .foregroundColor(.brandRed)
-                }
-                PrimaryButton(title: viewModel.guardando ? "Guardando…" : "Guardar ficha") {
-                    Task {
-                        if await viewModel.guardar() {
-                            dismiss()
-                        }
-                    }
-                }
-                .disabled(viewModel.guardando)
-                .opacity(viewModel.guardando ? 0.7 : 1)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+            botones
         }
         .tint(.brandRed)
-        .interactiveDismissDisabled(viewModel.guardando)
+        .interactiveDismissDisabled(viewModel.guardando || viewModel.hayCambios)
+        .confirmationDialog("¿Salir sin guardar?", isPresented: $confirmarSalida, titleVisibility: .visible) {
+            Button("Salir sin guardar", role: .destructive) { dismiss() }
+            Button("Seguir editando", role: .cancel) {}
+        } message: {
+            Text("Se perderán los cambios que hizo.")
+        }
         .alert("No se pudo guardar", isPresented: Binding(
             get: { viewModel.errorGuardado != nil },
             set: { if !$0 { viewModel.errorGuardado = nil } }
@@ -116,93 +63,346 @@ struct EditFichaMedicaView: View {
         }
     }
 
-    private var seccionAlergias: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Alergias").font(.app(.title3)).fontWeight(.bold)
+    // MARK: - Encabezado y botones
 
-            ForEach(viewModel.ficha.alergias) { alergia in
-                FilaEditable(texto: alergia.nombre) {
-                    SeveridadChip(severidad: alergia.severidad)
-                } eliminar: {
-                    viewModel.eliminarAlergia(alergia)
+    private var encabezado: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Button("Cancelar") {
+                    if viewModel.hayCambios { confirmarSalida = true } else { dismiss() }
+                }
+                .foregroundColor(.brandRed)
+                .frame(minHeight: 44)
+                Spacer()
+                Text("Paso \(viewModel.paso.numero) de \(EditFichaMedicaViewModel.Paso.allCases.count)")
+                    .font(.app(.headline))
+                Spacer()
+                // Al editar una ficha existente se puede guardar desde cualquier paso.
+                if !viewModel.esNueva {
+                    Button("Guardar") { Task { await guardar() } }
+                        .font(.app(.body).weight(.bold))
+                        .foregroundColor(.brandRed)
+                        .frame(minHeight: 44)
+                        .disabled(viewModel.guardando)
+                } else {
+                    Button("Cancelar") {}.hidden()
                 }
             }
+            ProgressView(value: viewModel.progreso)
+                .tint(.brandRed)
+                .accessibilityLabel("Avance")
+                .accessibilityValue("Paso \(viewModel.paso.numero) de \(EditFichaMedicaViewModel.Paso.allCases.count)")
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    TextField("Ej. Penicilina", text: $viewModel.nuevaAlergia)
-                        .padding(.horizontal, 14)
-                        .frame(height: 48)
-                        .fieldBorder(false)
-                        .onSubmit(viewModel.agregarAlergia)
-                    BotonAgregar(habilitado: viewModel.puedeAgregarAlergia, accion: viewModel.agregarAlergia)
+    private var botones: some View {
+        VStack(spacing: 10) {
+            if viewModel.mostrarError, let error = viewModel.errorPaso {
+                Label(error, systemImage: "exclamationmark.circle.fill")
+                    .font(.app(.subheadline).weight(.semibold))
+                    .foregroundColor(.brandRed)
+            }
+            HStack(spacing: 12) {
+                if viewModel.paso != .sangre {
+                    Button {
+                        withAnimation { viewModel.atras() }
+                    } label: {
+                        Text("Atrás")
+                            .font(.app(.headline))
+                            .foregroundColor(.brandRed)
+                            .frame(maxWidth: .infinity, minHeight: 56)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
+                    }
+                    .frame(maxWidth: 140)
                 }
-                ChipSelector(opciones: Severidad.allCases, seleccion: $viewModel.nuevaSeveridad, titulo: \.titulo)
+                if viewModel.esUltimoPaso {
+                    PrimaryButton(title: viewModel.guardando ? "Guardando…" : "Guardar ficha") {
+                        Task { await guardar() }
+                    }
+                    .disabled(viewModel.guardando)
+                    .opacity(viewModel.guardando ? 0.7 : 1)
+                } else {
+                    PrimaryButton(title: "Siguiente") {
+                        withAnimation { _ = viewModel.siguiente() }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+    }
+
+    private func guardar() async {
+        if await viewModel.guardar() { dismiss() }
+    }
+
+    // MARK: - Pasos
+
+    private var pasoSangre: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Pregunta(
+                texto: "¿Cuál es el tipo de sangre de \(persona)?",
+                ayuda: "Viene en estudios de laboratorio o en la credencial de donador. Si no lo sabe, elija «No lo sé»."
+            )
+            ChipSelector(
+                opciones: EditFichaMedicaViewModel.tiposSangre,
+                seleccion: $viewModel.ficha.tipoSanguineo,
+                titulo: \.titulo
+            )
+        }
+    }
+
+    private var pasoAlergias: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Pregunta(
+                texto: "¿\(tiene) alguna alergia?",
+                ayuda: "A medicinas, alimentos u otras cosas."
+            )
+            SiNoSelector(respuesta: $viewModel.tieneAlergias)
+
+            if viewModel.tieneAlergias == true {
+                Text("Toque las que tenga:")
+                    .font(.app(.headline))
+                ChipsMultiples(
+                    opciones: viewModel.opcionesAlergia,
+                    seleccionada: viewModel.tieneAlergia,
+                    alternar: viewModel.alternarAlergia
+                )
+                CampoOtra(
+                    titulo: "¿Otra alergia?",
+                    placeholder: "Escriba el nombre",
+                    texto: $viewModel.otraAlergia,
+                    agregar: viewModel.agregarOtraAlergia
+                )
+
+                if !viewModel.ficha.alergias.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("¿Qué le pasa con cada una?")
+                            .font(.app(.headline))
+                        ForEach(viewModel.ficha.alergias) { alergia in
+                            FilaSeveridad(alergia: alergia) { severidad in
+                                viewModel.cambiarSeveridad(de: alergia, a: severidad)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    private var seccionEnfermedades: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Enfermedades").font(.app(.title3)).fontWeight(.bold)
+    private var pasoEnfermedades: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Pregunta(
+                texto: "¿\(tiene) alguna enfermedad?",
+                ayuda: "Enfermedades que tiene ahora y requieren cuidado o medicinas."
+            )
+            SiNoSelector(respuesta: $viewModel.tieneEnfermedades)
 
-            ForEach(viewModel.ficha.enfermedades) { enfermedad in
-                FilaEditable(texto: enfermedad.nombre) {
-                    EmptyView()
-                } eliminar: {
-                    viewModel.eliminarEnfermedad(enfermedad)
-                }
+            if viewModel.tieneEnfermedades == true {
+                Text("Toque las que tenga:")
+                    .font(.app(.headline))
+                ChipsMultiples(
+                    opciones: viewModel.opcionesEnfermedad,
+                    seleccionada: viewModel.tieneEnfermedad,
+                    alternar: viewModel.alternarEnfermedad
+                )
+                CampoOtra(
+                    titulo: "¿Otra enfermedad?",
+                    placeholder: "Escriba el nombre",
+                    texto: $viewModel.otraEnfermedad,
+                    agregar: viewModel.agregarOtraEnfermedad
+                )
+            }
+        }
+    }
+
+    private var pasoDetalles: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Pregunta(
+                texto: "Más detalles",
+                ayuda: "Todo es opcional. Puede dejarlo en blanco y completarlo después."
+            )
+
+            FormFieldContainer(titulo: "¿Quién es su doctor?", error: viewModel.errorMedico) {
+                TextField("Nombre del doctor o doctora", text: $viewModel.medicoTratante)
+                    .textContentType(.name)
+                    .padding(16)
+                    .fieldBorder(viewModel.errorMedico != nil)
             }
 
-            HStack(spacing: 8) {
-                TextField("Ej. Diabetes tipo 2", text: $viewModel.nuevaEnfermedad)
-                    .padding(.horizontal, 14)
-                    .frame(height: 48)
-                    .fieldBorder(false)
-                    .onSubmit(viewModel.agregarEnfermedad)
-                BotonAgregar(habilitado: viewModel.puedeAgregarEnfermedad, accion: viewModel.agregarEnfermedad)
+            FormFieldContainer(titulo: "¿Dónde se atiende?", error: viewModel.errorInstitucion) {
+                ChipsMultiples(
+                    opciones: EditFichaMedicaViewModel.instituciones,
+                    seleccionada: { $0 == viewModel.institucionSalud },
+                    alternar: { opcion in
+                        viewModel.institucionSalud = viewModel.institucionSalud == opcion ? "" : opcion
+                    }
+                )
+                TextField("U otro lugar", text: $viewModel.institucionSalud)
+                    .padding(16)
+                    .fieldBorder(viewModel.errorInstitucion != nil)
+            }
+
+            FormFieldContainer(titulo: "¿Le han operado o ha tenido enfermedades importantes?", error: viewModel.errorAntecedentes) {
+                TextField("Ej. Operación de cadera en 2020", text: $viewModel.antecedentes, axis: .vertical)
+                    .lineLimit(3...6)
+                    .padding(16)
+                    .fieldBorder(viewModel.errorAntecedentes != nil)
+            }
+
+            FormFieldContainer(titulo: "¿Algo más que deba saber un médico?", error: viewModel.errorObservaciones) {
+                TextField("Ej. Usa marcapasos, lentes o una dieta especial", text: $viewModel.observaciones, axis: .vertical)
+                    .lineLimit(3...6)
+                    .padding(16)
+                    .fieldBorder(viewModel.errorObservaciones != nil)
             }
         }
     }
 }
 
-private struct FilaEditable<Accesorio: View>: View {
+// MARK: - Componentes
+
+private struct Pregunta: View {
     let texto: String
-    @ViewBuilder let accesorio: Accesorio
-    let eliminar: () -> Void
+    let ayuda: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(texto)
-            Spacer()
-            accesorio
-            Button(action: eliminar) {
-                Image(systemName: "minus.circle.fill")
-                    .icono(.seleccion)
-                    .foregroundColor(Color.iconoSuave)
-            }
-            .accessibilityLabel("Eliminar \(texto)")
+                .font(.app(.title2).weight(.bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text(ayuda)
+                .font(.app(.body))
+                .foregroundColor(.textoSuave)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 14)
-        .frame(height: 48)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.tintaSuave))
     }
 }
 
-private struct BotonAgregar: View {
-    let habilitado: Bool
-    let accion: () -> Void
+/// Dos botones grandes: contestar «No» es un solo toque.
+private struct SiNoSelector: View {
+    @Binding var respuesta: Bool?
 
     var body: some View {
-        Button(action: accion) {
-            Image(systemName: "plus")
-                .icono(.navegacion)
-                .foregroundColor(.white)
-                .frame(width: 48, height: 48)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.rojoSolido))
+        HStack(spacing: 12) {
+            boton("Sí", valor: true)
+            boton("No", valor: false)
         }
-        .disabled(!habilitado)
-        .opacity(habilitado ? 1 : 0.4)
-        .accessibilityLabel("Agregar")
+        .vibracion(.selection, trigger: respuesta)
+    }
+
+    private func boton(_ titulo: String, valor: Bool) -> some View {
+        let activo = respuesta == valor
+        return Button {
+            withAnimation { respuesta = valor }
+        } label: {
+            Text(titulo)
+                .font(.app(.title3).weight(.bold))
+                .foregroundColor(activo ? .white : .primary)
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .background(RoundedRectangle(cornerRadius: 16).fill(activo ? Color.rojoSolido : Color.superficie))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(activo ? Color.rojoSolido : Color.borderGray, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(activo ? .isSelected : [])
+    }
+}
+
+/// Chips que se marcan y desmarcan con un toque. Desmarcar es la forma de quitar,
+/// así que no hay botones de borrar que se puedan tocar por error.
+private struct ChipsMultiples: View {
+    let opciones: [String]
+    let seleccionada: (String) -> Bool
+    let alternar: (String) -> Void
+
+    @Environment(\.dynamicTypeSize) private var tipo
+
+    private var columnas: [GridItem] {
+        [GridItem(.adaptive(minimum: tipo.isAccessibilitySize ? 220 : 140), spacing: 8)]
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columnas, alignment: .leading, spacing: 8) {
+            ForEach(opciones, id: \.self) { opcion in
+                let activo = seleccionada(opcion)
+                Button {
+                    alternar(opcion)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: activo ? "checkmark.circle.fill" : "circle")
+                            .accessibilityHidden(true)
+                        Text(opcion)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
+                    .font(.app(.subheadline).weight(.semibold))
+                    .foregroundColor(activo ? .white : .primary)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(activo ? Color.rojoSolido : Color.superficie))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(activo ? Color.rojoSolido : Color.borderGray, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(activo ? .isSelected : [])
+            }
+        }
+    }
+}
+
+private struct CampoOtra: View {
+    let titulo: String
+    let placeholder: String
+    @Binding var texto: String
+    let agregar: () -> Void
+
+    private var habilitado: Bool { !texto.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var body: some View {
+        FormFieldContainer(titulo: titulo) {
+            HStack(spacing: 8) {
+                TextField(placeholder, text: $texto)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 52)
+                    .fieldBorder(false)
+                    .onSubmit(agregar)
+                Button("Agregar", action: agregar)
+                    .font(.app(.subheadline).weight(.bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 52)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.rojoSolido))
+                    .disabled(!habilitado)
+                    .opacity(habilitado ? 1 : 0.4)
+            }
+        }
+    }
+}
+
+private struct FilaSeveridad: View {
+    let alergia: Alergia
+    let cambiar: (Severidad) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(alergia.nombre)
+                .font(.app(.body).weight(.semibold))
+            Picker("Qué le pasa con \(alergia.nombre)", selection: Binding(
+                get: { alergia.severidad },
+                set: { cambiar($0) }
+            )) {
+                ForEach(Severidad.allCases) { severidad in
+                    Text(severidad.descripcion).tag(severidad)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+        .padding(14)
+        .tarjetaBorde(radio: 14)
     }
 }
