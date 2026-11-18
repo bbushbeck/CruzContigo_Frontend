@@ -212,6 +212,8 @@ private struct EditorRecordatorioView: View {
     @State private var titulo: String
     @State private var familiarID: UUID?
     @State private var fecha: Date
+    @State private var categoriaIA: CategoriaRecordatorio = .general
+    @State private var mensajeIA: String?
     @State private var guardando = false
     @State private var error: String?
 
@@ -231,6 +233,26 @@ private struct EditorRecordatorioView: View {
         NavigationStack {
             Form {
                 TextField("Nombre del recordatorio", text: $titulo)
+                Button {
+                    let resultado = ClasificadorRecordatorios.clasificar(titulo)
+                    categoriaIA = resultado.categoria
+                    mensajeIA = resultado.mensaje
+                } label: {
+                    Label("Sugerir categoría con IA", systemImage: "sparkles")
+                }
+                .disabled(titulo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || guardando)
+
+                Picker("Categoría sugerida", selection: $categoriaIA) {
+                    ForEach(CategoriaRecordatorio.allCases) { categoria in
+                        Text(categoria.nombre).tag(categoria)
+                    }
+                }
+
+                if let mensajeIA {
+                    Text(mensajeIA)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Picker("Familiar", selection: $familiarID) {
                     ForEach(familiares) { familiar in
                         Text(familiar.nombreCompleto).tag(Optional(familiar.id))
