@@ -5,7 +5,6 @@ struct ContentView: View {
     @AppStorage("onboardingCompletado") private var onboardingCompletado = false
     @State private var auth = AuthViewModel()
     @State private var familiaresStore = FamiliaresStore()
-    @State private var recordatoriosStore = RecordatoriosStore()
     @State private var preferencias = Preferencias.compartidas
 
     var body: some View {
@@ -24,7 +23,6 @@ struct ContentView: View {
         }
         .environment(auth)
         .environment(familiaresStore)
-        .environment(recordatoriosStore)
         .environment(preferencias)
         .aplicarPreferencias(preferencias)
         .environment(\.locale, Locale(identifier: "es_MX"))

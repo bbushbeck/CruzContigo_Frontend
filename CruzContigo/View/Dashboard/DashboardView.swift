@@ -14,6 +14,8 @@ struct DashboardView: View {
     @AppStorage(ClavesApp.primerosPasosOcultos) private var primerosPasosOcultos = false
     @State private var ruta: [Ruta] = []
     @State private var mostrarEmergencia = false
+    @State private var mostrarFrida = false
+    @State private var destinoFrida: Ruta?
     @Environment(\.openURL) private var abrirURL
 
     private var seleccionada: Familiar? {
@@ -26,6 +28,7 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     encabezado
                     saludo
+                    accesoFrida
                     seccionPersonas
                     Button { mostrarEmergencia = true } label: { EmergenciaCard() }
                         .buttonStyle(.plain)
@@ -54,6 +57,12 @@ struct DashboardView: View {
         .task {
             if store.estado == .inicial { await store.cargar() }
         }
+        .sheet(isPresented: $mostrarFrida, onDismiss: navegarDesdeFrida) {
+            FridaView(familiarSeleccionado: seleccionada?.id) { destino in
+                destinoFrida = destino
+                mostrarFrida = false
+            }
+        }
         .sheet(isPresented: $mostrarEmergencia) {
             EmergenciaSheet(persona: seleccionada) { modulo in
                 mostrarEmergencia = false
@@ -64,6 +73,38 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+
+    private var accesoFrida: some View {
+        Button {
+            mostrarFrida = true
+        } label: {
+            HStack(spacing: 12) {
+                Image("FridaAvatar")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .background(Color.tintaSuave, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Habla con Frida").font(.app(.headline))
+                    Text("Consulta medicamentos y recordatorios")
+                        .font(.app(.subheadline))
+                        .foregroundStyle(Color.textoSuave)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+            }
+            .padding(12)
+            .tarjetaBorde()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func navegarDesdeFrida() {
+        guard let destinoFrida else { return }
+        ruta.append(destinoFrida)
+        self.destinoFrida = nil
     }
 
     private var encabezado: some View {
@@ -261,32 +302,24 @@ struct DashboardView: View {
     }
 
     private var seccionRecordatorios: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SeccionHeader(titulo: "Próximos recordatorios") {
-                Button {
-                    pestana = .recordatorios
-                } label: {
-                    EnlaceTexto(titulo: "Ver todos", icono: nil)
-                }
-            }
+        Button {
+            pestana = .recordatorios
+        } label: {
             HStack(spacing: 14) {
-                Image(systemName: "bell.badge")
+                Image(systemName: "bell")
                     .icono(.mediano)
-                    .foregroundColor(.textoSuave)
+                    .foregroundColor(.brandRed)
                     .frame(width: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Nada pendiente por ahora")
-                        .font(.app(.subheadline).weight(.semibold))
-                    Text("Cuando registres medicamentos o citas, sus avisos aparecerán aquí.")
-                        .font(.app(.footnote))
-                        .foregroundColor(.textoSuave)
-                }
+                    .accessibilityHidden(true)
+                Text("Ver recordatorios")
+                    .font(.app(.subheadline).weight(.semibold))
                 Spacer(minLength: 0)
+                Image(systemName: "chevron.right").accessibilityHidden(true)
             }
             .padding(16)
             .tarjetaBorde()
-            .accessibilityElement(children: .combine)
         }
+        .buttonStyle(.plain)
     }
 
     private var cargando: some View {
