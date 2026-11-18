@@ -2,6 +2,9 @@
 //  FichaMedicaView.swift
 //  CruzContigo
 //
+//  Ordenada por importancia en una emergencia: primero sangre y alergias, después
+//  enfermedades y, plegado, lo demás. Las secciones vacías no se muestran.
+//
 
 import SwiftUI
 
@@ -14,6 +17,7 @@ struct FichaMedicaView: View {
     @State private var editando = false
     @State private var mostrandoDocumentos = false
     @State private var gestionandoAccesos = false
+    @State private var detallesAbiertos = false
 
     init(familiarID: UUID) {
         self.familiarID = familiarID
@@ -65,6 +69,7 @@ struct FichaMedicaView: View {
         }
     }
 
+    private var puedeEditar: Bool { familiar?.puedeEditar == true }
     private var puedeVerDocumentos: Bool { familiar?.esProfesional != true }
 
     private var muestraAccesos: Bool {
@@ -72,25 +77,28 @@ struct FichaMedicaView: View {
         return viewModel.estado == .lista || viewModel.estado == .sinFicha
     }
 
+    // MARK: - Encabezado
+
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             BrandBackButton { dismiss() }
             Spacer()
             if muestraAccesos {
-                Button {
-                    gestionandoAccesos = true
+                Menu {
+                    Button {
+                        gestionandoAccesos = true
+                    } label: {
+                        Label("Quién puede verla", systemImage: "person.badge.key.fill")
+                    }
                 } label: {
-                    Label("Accesos", systemImage: "person.badge.key.fill")
-                        .font(.app(.subheadline).weight(.bold))
+                    Image(systemName: "ellipsis.circle")
+                        .icono(.navegacion)
                         .foregroundColor(.brandRed)
-                        .padding(.horizontal, 14)
-                        .frame(height: 44)
-                        .background(Color.tintaSuave)
-                        .cornerRadius(12)
+                        .frame(width: 44, height: 44)
                 }
-                .accessibilityHint("Autoriza o retira quién puede ver esta ficha")
+                .accessibilityLabel("Más opciones")
             }
-            if viewModel.estado == .lista, familiar?.puedeEditar == true {
+            if viewModel.estado == .lista, puedeEditar {
                 Button {
                     editando = true
                 } label: {
@@ -114,9 +122,12 @@ struct FichaMedicaView: View {
                 .foregroundColor(.brandRed)
             Text(familiar?.nombreCompleto ?? "Familiar")
                 .font(.app(.title).weight(.bold))
+                .accessibilityAddTraits(.isHeader)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    // MARK: - Sin ficha
 
     private var sinFicha: some View {
         VStack(spacing: 0) {
@@ -125,26 +136,22 @@ struct FichaMedicaView: View {
                 .padding(.top, 16)
             Spacer()
             VStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 96, height: 96)
-                    Image(systemName: "doc.text.fill")
-                        .icono(.destacado)
-                        .foregroundColor(.brandRed)
-                }
-                Text("Sin ficha médica")
-                    .font(.app(.headline))
-                Text("Registra su tipo de sangre, alergias y enfermedades para tenerlos a la mano en una emergencia.")
-                    .font(.app(.subheadline))
+                Image(systemName: "heart.text.square.fill")
+                    .icono(.destacado)
+                    .foregroundColor(.brandRed)
+                    .accessibilityHidden(true)
+                Text("Aún no tiene ficha médica")
+                    .font(.app(.title3).weight(.bold))
+                Text("Son 3 preguntas: tipo de sangre, alergias y enfermedades. Sirven para que un médico le atienda rápido en una emergencia.")
+                    .font(.app(.body))
                     .foregroundColor(.textoSuave)
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 32)
             Spacer()
             VStack(spacing: 8) {
-                if familiar?.puedeEditar == true {
-                    PrimaryButton(title: "Crear ficha médica") { editando = true }
+                if puedeEditar {
+                    PrimaryButton(title: "Empezar") { editando = true }
                 }
                 if puedeVerDocumentos {
                     Button("Ver documentos médicos") { mostrandoDocumentos = true }
@@ -157,6 +164,8 @@ struct FichaMedicaView: View {
         }
     }
 
+    // MARK: - Ficha
+
     private func contenido(_ ficha: FichaMedica) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -164,60 +173,35 @@ struct FichaMedicaView: View {
                 if familiar?.esProfesional == true {
                     avisoProfesional
                 }
-                tarjetaSangre(ficha)
 
-                SeccionFicha(titulo: "Alergias", icono: "allergens", vacio: "Sin alergias registradas") {
-                    ForEach(ficha.alergias) { alergia in
-                        HStack {
-                            Text(alergia.nombre).font(.app(.body))
-                            Spacer()
-                            SeveridadChip(severidad: alergia.severidad)
-                        }
-                        .padding(.vertical, 6)
-                    }
-                } esVacio: { ficha.alergias.isEmpty }
+                TarjetaEmergencia(ficha: ficha)
 
-                SeccionFicha(titulo: "Enfermedades", icono: "heart.text.square", vacio: "Sin enfermedades registradas") {
-                    ForEach(ficha.enfermedades) { enfermedad in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(enfermedad.nombre).font(.app(.body))
-                            if let notas = enfermedad.notas {
-                                Text(notas).font(.app(.caption)).foregroundColor(.textoSuave)
+                if puedeEditar, !ficha.datosPendientes.isEmpty {
+                    pendientes(ficha.datosPendientes)
+                }
+
+                if !ficha.enfermedades.isEmpty {
+                    SeccionFicha(titulo: "Enfermedades", icono: "heart.text.square", vacio: "") {
+                        ForEach(ficha.enfermedades) { enfermedad in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(enfermedad.nombre).font(.app(.body))
+                                if let notas = enfermedad.notas {
+                                    Text(notas).font(.app(.caption)).foregroundColor(.textoSuave)
+                                }
                             }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
-                    }
-                } esVacio: { ficha.enfermedades.isEmpty }
-
-                if let antecedentes = ficha.antecedentes {
-                    SeccionFicha(titulo: "Antecedentes", icono: "clock.arrow.circlepath", vacio: "") {
-                        Text(antecedentes).font(.app(.body))
-                    } esVacio: { false }
-                }
-
-                if ficha.medicoTratante != nil || ficha.institucionSalud != nil {
-                    SeccionFicha(titulo: "Atención médica", icono: "stethoscope", vacio: "") {
-                        if let medico = ficha.medicoTratante {
-                            Text("Médico tratante").font(.app(.caption)).foregroundColor(.textoSuave)
-                            Text(medico).font(.app(.body)).padding(.bottom, 6)
-                        }
-                        if let institucion = ficha.institucionSalud {
-                            Text("Institución de salud").font(.app(.caption)).foregroundColor(.textoSuave)
-                            Text(institucion).font(.app(.body))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
                         }
                     } esVacio: { false }
                 }
 
-                if let observaciones = ficha.observaciones {
-                    SeccionFicha(titulo: "Observaciones", icono: "note.text", vacio: "") {
-                        Text(observaciones).font(.app(.body))
-                    } esVacio: { false }
+                if ficha.tieneDetalles {
+                    masDetalles(ficha)
                 }
 
                 if puedeVerDocumentos {
                     Button { mostrandoDocumentos = true } label: {
-                        Label("Documentos médicos", systemImage: "folder.fill")
+                        Label("Recetas y estudios", systemImage: "folder.fill")
                             .font(.app(.headline))
                             .frame(maxWidth: .infinity, minHeight: 52)
                             .background(RoundedRectangle(cornerRadius: 16).fill(Color.tintaSuave))
@@ -234,6 +218,62 @@ struct FichaMedicaView: View {
             .padding(.top, 16)
             .padding(.bottom, 32)
         }
+    }
+
+    private func pendientes(_ datos: [String]) -> some View {
+        Button {
+            editando = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .icono(.seleccion)
+                    .foregroundColor(.brandRed)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Falta: \(datos.joined(separator: ", "))")
+                        .font(.app(.subheadline).weight(.semibold))
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                    Text("Completar")
+                        .font(.app(.subheadline).weight(.bold))
+                        .foregroundColor(.brandRed)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.tintaSuave))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func masDetalles(_ ficha: FichaMedica) -> some View {
+        DisclosureGroup(isExpanded: $detallesAbiertos) {
+            VStack(alignment: .leading, spacing: 14) {
+                if let medico = ficha.medicoTratante {
+                    Dato(titulo: "Su doctor", valor: medico)
+                }
+                if let institucion = ficha.institucionSalud {
+                    Dato(titulo: "Dónde se atiende", valor: institucion)
+                }
+                if let antecedentes = ficha.antecedentes {
+                    Dato(titulo: "Operaciones o enfermedades pasadas", valor: antecedentes)
+                }
+                if let observaciones = ficha.observaciones {
+                    Dato(titulo: "Algo más que deba saber un médico", valor: observaciones)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 12)
+        } label: {
+            Label("Más detalles", systemImage: "list.bullet.rectangle")
+                .font(.app(.headline))
+                .foregroundColor(.primary)
+                .frame(minHeight: 44)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .tarjetaBorde(radio: 18)
     }
 
     private var avisoProfesional: some View {
@@ -273,28 +313,91 @@ struct FichaMedicaView: View {
         .padding(.horizontal, 24)
         .padding(.bottom, 32)
     }
+}
 
-    private func tarjetaSangre(_ ficha: FichaMedica) -> some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.clear)
-                    .frame(width: 64, height: 64)
+// MARK: - Componentes
+
+/// Lo primero que necesita un paramédico: tipo de sangre y alergias, con las
+/// peligrosas marcadas. Se reutiliza en la ficha de emergencia sin conexión.
+struct TarjetaEmergencia: View {
+    let tipoSanguineo: TipoSanguineo?
+    let alergias: [Alergia]
+
+    init(ficha: FichaMedica) {
+        self.init(tipoSanguineo: ficha.tipoSanguineo, alergias: ficha.alergias)
+    }
+
+    init(tipoSanguineo: TipoSanguineo?, alergias: [Alergia]) {
+        self.tipoSanguineo = tipoSanguineo
+        self.alergias = alergias.sorted { ($0.severidad == .grave ? 0 : 1) < ($1.severidad == .grave ? 0 : 1) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
                 Image(systemName: "drop.fill")
                     .icono(.grande)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Tipo de sangre")
+                        .font(.app(.subheadline).weight(.semibold))
+                        .opacity(0.9)
+                    Text(tipoSanguineo?.titulo ?? "No lo sé")
+                        .font(.app(.largeTitle).weight(.bold))
+                }
+                Spacer()
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Tipo sanguíneo")
+            .accessibilityElement(children: .combine)
+
+            Divider().overlay(Color.white.opacity(0.4))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Alergias")
                     .font(.app(.subheadline).weight(.semibold))
                     .opacity(0.9)
-                Text(ficha.tipoSanguineo?.titulo ?? "—")
-                    .font(.system(size: 34, weight: .bold))
+                if alergias.isEmpty {
+                    Text("Sin alergias conocidas")
+                        .font(.app(.title3).weight(.bold))
+                } else {
+                    ForEach(alergias) { alergia in
+                        HStack(spacing: 8) {
+                            if alergia.severidad == .grave {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .accessibilityHidden(true)
+                            }
+                            Text(alergia.nombre)
+                                .font(.app(.title3).weight(.bold))
+                            Spacer()
+                            Text(alergia.severidad.titulo)
+                                .font(.app(.caption).weight(.bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(Color.white.opacity(alergia.severidad == .grave ? 0.35 : 0.2)))
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
             }
-            Spacer()
         }
         .foregroundColor(.white)
         .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 20).fill(Color.rojoSolido))
+    }
+}
+
+private struct Dato: View {
+    let titulo: String
+    let valor: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(titulo)
+                .font(.app(.caption))
+                .foregroundColor(.textoSuave)
+            Text(valor)
+                .font(.app(.body))
+        }
         .accessibilityElement(children: .combine)
     }
 }

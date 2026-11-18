@@ -21,7 +21,24 @@ enum Severidad: String, Codable, CaseIterable, Identifiable {
     case leve, moderada, grave
 
     var id: String { rawValue }
-    var titulo: String { rawValue.capitalized }
+
+    /// Etiqueta corta para chips y listas.
+    var titulo: String {
+        switch self {
+        case .leve: "Leve"
+        case .moderada: "Fuerte"
+        case .grave: "Peligrosa"
+        }
+    }
+
+    /// Explicación en lenguaje cotidiano para quien no es médico.
+    var descripcion: String {
+        switch self {
+        case .leve: "Le molesta un poco (comezón, ronchas)"
+        case .moderada: "Le hace daño (vómito, mucha hinchazón)"
+        case .grave: "Es peligroso (le falta el aire, se desmaya)"
+        }
+    }
 }
 
 struct Alergia: Codable, Identifiable, Hashable {
@@ -60,6 +77,19 @@ struct FichaMedica: Codable, Hashable {
     }
 
     var esValida: Bool { errores.isEmpty }
+
+    /// Lo que un paramédico necesita y todavía no está registrado.
+    var datosPendientes: [String] {
+        var pendientes: [String] = []
+        if tipoSanguineo == nil || tipoSanguineo == .desconocido { pendientes.append("tipo de sangre") }
+        if medicoTratante == nil { pendientes.append("su doctor") }
+        if institucionSalud == nil { pendientes.append("dónde se atiende") }
+        return pendientes
+    }
+
+    var tieneDetalles: Bool {
+        medicoTratante != nil || institucionSalud != nil || antecedentes != nil || observaciones != nil
+    }
 
     private static func tieneDuplicados(_ nombres: [String]) -> Bool {
         let normalizados = nombres.map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
