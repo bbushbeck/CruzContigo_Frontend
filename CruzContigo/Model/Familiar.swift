@@ -83,6 +83,17 @@ struct Familiar: Codable, Identifiable, Hashable {
         return ["titular", "administrador", "cocuidador"].contains(rol)
     }
 
+    /// Acceso institucional bajo convenio: solo consulta la ficha médica (HU-16).
+    var esProfesional: Bool { rol == RolAcceso.profesional.rawValue }
+
+    /// La persona titular o su responsable deciden quién accede (HU-08). El servidor
+    /// confirma el permiso; esto solo decide si se muestra la opción.
+    var puedeGestionarAccesos: Bool {
+        rol == RolAcceso.titular.rawValue || rol == RolAcceso.administrador.rawValue
+    }
+
+    var modulosVisibles: [Modulo] { esProfesional ? [.fichaMedica] : Modulo.delPerfil }
+
     var iniciales: String {
         let n = nombre.first.map(String.init) ?? ""
         let a = apellidos.first.map(String.init) ?? ""

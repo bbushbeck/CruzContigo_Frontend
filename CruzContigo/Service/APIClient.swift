@@ -24,6 +24,8 @@ enum APIError: LocalizedError {
     case respuestaInvalida
     case http(Int)
     case servidor(String)
+    /// 403: la cuenta no tiene (o ya no tiene) permiso sobre el recurso.
+    case sinAcceso(String)
     case decodificacion(Error)
     case red(Error)
 
@@ -32,6 +34,7 @@ enum APIError: LocalizedError {
         case .respuestaInvalida: "El servidor devolvió una respuesta inválida."
         case .http(let codigo): "El servidor respondió con error \(codigo)."
         case .servidor(let mensaje): mensaje
+        case .sinAcceso(let mensaje): mensaje
         case .decodificacion: "No se pudieron leer los datos recibidos."
         case .red: "No hay conexión con el servidor."
         }
@@ -101,7 +104,11 @@ struct APIClient {
         }
         guard let http = respuesta as? HTTPURLResponse else { throw APIError.respuestaInvalida }
         guard (200..<300).contains(http.statusCode) else {
-            if let cuerpo = try? Self.decoder.decode(RespuestaError.self, from: datos) {
+            let cuerpo = try? Self.decoder.decode(RespuestaError.self, from: datos)
+            if http.statusCode == 403 {
+                throw APIError.sinAcceso(cuerpo?.mensaje ?? "Ya no tienes acceso a esta información.")
+            }
+            if let cuerpo {
                 throw APIError.servidor(cuerpo.mensaje)
             }
             throw APIError.http(http.statusCode)
