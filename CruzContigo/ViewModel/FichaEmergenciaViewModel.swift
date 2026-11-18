@@ -26,12 +26,12 @@ final class FichaEmergenciaViewModel {
 
     init(
         familiarID: UUID,
-        sincronizador: SincronizadorFichaEmergencia = SincronizadorFichaEmergencia(),
-        accesos: AccesosRepository = Repositorios.accesos()
+        sincronizador: SincronizadorFichaEmergencia? = nil,
+        accesos: AccesosRepository? = nil
     ) {
         self.familiarID = familiarID
-        self.sincronizador = sincronizador
-        self.accesos = accesos
+        self.sincronizador = sincronizador ?? SincronizadorFichaEmergencia()
+        self.accesos = accesos ?? Repositorios.accesos()
     }
 
     /// Primero muestra la copia guardada (abre al instante y en modo avión) y después

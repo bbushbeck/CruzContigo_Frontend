@@ -23,9 +23,9 @@ final class AccesosFichaViewModel {
 
     private let repositorio: AccesosRepository
 
-    init(familiarID: UUID, repositorio: AccesosRepository = Repositorios.accesos()) {
+    init(familiarID: UUID, repositorio: AccesosRepository? = nil) {
         self.familiarID = familiarID
-        self.repositorio = repositorio
+        self.repositorio = repositorio ?? Repositorios.accesos()
     }
 
     /// El texto que ve la persona debe ser el mismo que acepta. Si el servidor ya usa otra

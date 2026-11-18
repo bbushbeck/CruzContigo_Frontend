@@ -23,7 +23,7 @@ actor DemoMedicationService: MedicationService {
 }
 
 extension Medication {
-    static let examples: [Medication] = [
+    nonisolated static let examples: [Medication] = [
         Medication(recipientID: CareRecipient.maria.id, name: "Paracetamol", presentation: "Tableta", dose: "500.00", unit: "mg", frequency: "Cada 8 horas", startDate: MedicationDay.string(from: .now), indication: "Dolor o fiebre"),
         Medication(recipientID: CareRecipient.maria.id, name: "Metformina", dose: "850.00", unit: "mg", frequency: "Cada 12 horas", startDate: MedicationDay.string(from: .now)),
         Medication(recipientID: CareRecipient.maria.id, name: "Atorvastatina", dose: "10.00", unit: "mg", startDate: "2020-01-01", endDate: "2020-01-02"),

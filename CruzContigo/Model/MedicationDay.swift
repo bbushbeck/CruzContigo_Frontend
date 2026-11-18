@@ -2,7 +2,7 @@ import Foundation
 
 /// Convierte fechas entre `Date` y el texto YYYY-MM-DD que usa la API.
 enum MedicationDay {
-    private static var formatter: DateFormatter {
+    nonisolated private static var formatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -12,9 +12,9 @@ enum MedicationDay {
         return formatter
     }
 
-    static func string(from date: Date) -> String { formatter.string(from: date) }
-    static func date(from string: String) -> Date? { formatter.date(from: string) }
-    static func label(_ string: String) -> String {
+    nonisolated static func string(from date: Date) -> String { formatter.string(from: date) }
+    nonisolated static func date(from string: String) -> Date? { formatter.date(from: string) }
+    nonisolated static func label(_ string: String) -> String {
         date(from: string)?.formatted(date: .abbreviated, time: .omitted) ?? string
     }
 }
