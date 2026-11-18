@@ -5,7 +5,8 @@ CruzContigo es una app para personas cuidadoras. Permite consultar la informaci�
 ## Funciones disponibles
 
 - **Inicio de sesión.** Acceso con número de teléfono y código de verificación. La sesión se guarda en el Keychain de iOS.
-- **Personas y ficha médica.** Registro y consulta de familiares. La ficha permite editar datos como alergias, padecimientos, tipo de sangre y contactos médicos.
+- **Personas y ficha médica.** Registro y consulta de familiares. La ficha se llena en cuatro pasos cortos (tipo de sangre, alergias, enfermedades y detalles opcionales), con respuestas de Sí/No y sugerencias para tocar. Al consultarla, el tipo de sangre y las alergias peligrosas aparecen primero y el resto queda plegado.
+- **Ficha de emergencia sin conexión.** Desde **Inicio → Emergencia → Ficha de emergencia** (dos toques) se ve un resumen con sangre, alergias, enfermedades, medicamentos activos y contactos. La app guarda una copia protegida en el teléfono, así que también abre en modo avión. Se actualiza al cargar la lista de familiares o al editar la ficha, y se borra al cerrar sesión o al perder el acceso. El código QR solo aparece si la persona titular o su responsable lo permitieron, y el permiso queda registrado.
 - **Accesos a la ficha.** Desde la ficha, la persona titular o su responsable pueden autorizar a otra cuenta por su teléfono (cocuidador, solo lectura o profesional de salud) y retirar el acceso en cualquier momento. Para autorizar hay que aceptar el aviso de privacidad, y su versión queda guardada como evidencia. Un profesional bajo convenio solo consulta la ficha, por tiempo limitado, y cada consulta queda registrada. Si te retiran un acceso, la ficha deja de mostrarse en la siguiente consulta.
 - **Medicamentos.** Alta, consulta, edición y eliminación de tratamientos por familiar. El formulario guarda dosis, unidad, frecuencia, fechas, existencias y umbral de resurtido. Los tratamientos finalizados aparecen en **Anteriores**.
 - **Lectura de recetas.** En iOS 27 con Apple Intelligence disponible, el formulario permite seleccionar una foto de una receta y extraer datos del medicamento. Puedes revisar y corregir los campos antes de guardar. La captura manual está disponible.
@@ -34,7 +35,7 @@ La app se conecta a MySQL a través de la API. Las credenciales de la base de da
 
 ## Pruebas
 
-El target `CruzContigoTests` incluye pruebas unitarias con Swift Testing de modelos y validaciones de familiares, la validación del teléfono, las consultas de Frida y los accesos a la ficha médica (`AccesosFichaTests`). Ejecútalas en Xcode con **Product → Test** o **⌘U**.
+El target `CruzContigoTests` incluye pruebas unitarias con Swift Testing de modelos y validaciones de familiares, la validación del teléfono, las consultas de Frida los accesos a la ficha médica (`AccesosFichaTests`) y el formulario por pasos y la ficha de emergencia (`FichaEmergenciaTests`). Ejecútalas en Xcode con **Product → Test** o **⌘U**.
 
 Para una prueba manual, registra un familiar, agrega un medicamento y un recordatorio, vuelve a abrir sus pantallas para comprobar que se guardaron y consulta ambos desde Frida.
 
