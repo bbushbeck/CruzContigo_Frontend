@@ -61,17 +61,60 @@ struct FridaDiarioTests {
         #expect(borrador.nota.texto == "Hoy me sentí bien.")
     }
 
-    @Test func elResumenEsEditableYPreservaElRelatoOriginalComoRespaldo() {
+    @Test func elResumenConservaElTextoYElOrdenDelRelato() {
         var borrador = BorradorDiarioFrida(texto: "Hoy salí a caminar.")
-        let agrego = borrador.agregar("Fui al parque.")
-        #expect(agrego)
-        let propuesta = borrador.notaParaRevision(resumen: "  Hoy caminé en el parque.  ")
-        #expect(propuesta.texto == "Hoy caminé en el parque.")
+        let dijoLugar = borrador.agregar("Fui al parque.")
+        let agregoRelleno = borrador.agregar("Qué más te iba a contar.")
+        #expect(dijoLugar)
+        #expect(agregoRelleno)
+        let propuesta = borrador.notaParaRevision(seleccion: [2, 1, 1])
+        #expect(propuesta.texto == "Hoy salí a caminar.\nFui al parque.")
         #expect(propuesta.esValida)
-        #expect(borrador.nota.texto == "Hoy salí a caminar.\nFui al parque.")
-        #expect(borrador.notaParaRevision(resumen: nil) == borrador.nota)
-        #expect(borrador.notaParaRevision(resumen: " ") == borrador.nota)
-        #expect(borrador.notaParaRevision(resumen: String(repeating: "a", count: SolicitudNota.largoMaximo + 1)) == borrador.nota)
+        #expect(borrador.nota.texto.hasSuffix("Qué más te iba a contar."))
+        #expect(borrador.notaParaRevision(seleccion: nil) == borrador.nota)
+        #expect(borrador.notaParaRevision(seleccion: []) == borrador.nota)
+        #expect(borrador.notaParaRevision(seleccion: [0, 4]) == borrador.nota)
+    }
+
+    @Test func separaElNombreDelAsistenteDeQuienCuentaElRelato() {
+        let texto = "Frida tengo muchas deudas por los medicamentos de mi mamá. Hoy fue difícil y estoy triste."
+        #expect(BorradorDiarioFrida.esRelatoCotidiano(texto))
+        let borrador = BorradorDiarioFrida(texto: texto)
+        let propuesta = borrador.notaParaRevision(seleccion: [1])
+        #expect(propuesta.texto == "Tengo muchas deudas por los medicamentos de mi mamá. Hoy fue difícil y estoy triste.")
+
+        let mascota = "Frida, mi perrita, salió a caminar conmigo."
+        #expect(FragmentosRelatoFrida.sinVocativo(mascota) == mascota)
+        #expect(FragmentosRelatoFrida.sinVocativo("Frida salió a caminar.") == "Frida salió a caminar.")
+        #expect(FragmentosRelatoFrida.sinVocativo("Ay, Frida, hoy estuve triste.") == "Hoy estuve triste.")
+        #expect(FragmentosRelatoFrida.sinVocativo("Frida salí a caminar.") == "Salí a caminar.")
+    }
+
+    @Test func evitaOmitirCorreccionesYAntecedentes() {
+        let relato = "Mi mamá no ha comido bien.\nDesde hace una semana.\nMe preocupa."
+        let parte = FragmentosRelatoFrida(relato)
+        #expect(parte.resumen(seleccion: [1, 3]) == relato)
+        #expect(parte.resumen(seleccion: [2, 3]) == relato)
+
+        let cambioDeContexto = FragmentosRelatoFrida("Mi hermana me acompañó.\nElla estaba contenta.")
+        #expect(cambioDeContexto.resumen(seleccion: [2]) == "Mi hermana me acompañó.\nElla estaba contenta.")
+    }
+
+    @Test func haceSeguimientoNaturalCuandoUnFamiliarComePoco() {
+        let texto = "Últimamente no tiene antojo mi hermana, no ha comido bien y me preocupa."
+        let preguntaDelModelo = SugerenciaNotaFrida(categoria: "alimentacion", detalle: "hora", tono: "dificil", yaPreguntados: [])
+        #expect(BorradorDiarioFrida.esRelatoCotidiano(texto))
+        #expect(preguntaDelModelo.respuesta(para: texto) == "Entiendo que te preocupe cómo ha estado comiendo.")
+
+        var borrador = BorradorDiarioFrida(texto: texto)
+        let pregunta = borrador.elegirPregunta(preguntaDelModelo, ultimoMensaje: texto)
+        #expect(pregunta == .desdeCuando)
+        #expect(borrador.nota.categoria == .alimentacion)
+
+        let conDuracion = "No ha comido bien desde hace una semana."
+        var otroBorrador = BorradorDiarioFrida(texto: conDuracion)
+        let otraPregunta = otroBorrador.elegirPregunta(preguntaDelModelo, ultimoMensaje: conDuracion)
+        #expect(otraPregunta == .quePesa)
     }
 
     @Test func conservaPreguntasYRespuestasDentroDeLasOpcionesPermitidas() {

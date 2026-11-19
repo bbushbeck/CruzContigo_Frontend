@@ -34,9 +34,9 @@ preguntas sencillas según el relato. Cuando termines o después de varias
 intervenciones ofrece preparar un resumen para el diario. También puedes
 pedírselo con «Guarda esto en mi diario».
 
-En **Revisar resumen** puedes editar el resumen generado por Apple Intelligence
-(o el relato original cuando el modelo no está disponible), elegir el diario
-y revisar quién podrá leerlo. **Guardar en diario** envía la nota a la API con
+En **Revisar resumen**, Apple Intelligence elige fragmentos del relato. Puedes
+compararlos con el texto original, editar la nota, elegir el diario y revisar
+quién podrá leerla. Si el modelo no está disponible, se conserva el relato. **Guardar en diario** envía la nota a la API con
 tu sesión.
 
 Si le dices a Frida que quieres seguir platicando, respeta ese ritmo. Las

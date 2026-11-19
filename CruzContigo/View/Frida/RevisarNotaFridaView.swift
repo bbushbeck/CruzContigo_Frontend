@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RevisarNotaFridaView: View {
+    let relatoOriginal: String
     let personas: [Familiar]
     let alGuardar: (Familiar) -> Void
 
@@ -11,9 +12,10 @@ struct RevisarNotaFridaView: View {
     @State private var error: String?
 
     init(
-        nota: SolicitudNota, personas: [Familiar], personaInicial: UUID?,
+        nota: SolicitudNota, relatoOriginal: String, personas: [Familiar], personaInicial: UUID?,
         alGuardar: @escaping (Familiar) -> Void
     ) {
+        self.relatoOriginal = relatoOriginal
         self.personas = personas
         self.alGuardar = alGuardar
         _nota = State(initialValue: nota)
@@ -56,6 +58,11 @@ struct RevisarNotaFridaView: View {
                         .accessibilityLabel("Texto de la nota")
                     if let error = nota.errores.first {
                         Text(error).foregroundStyle(Color.brandRed)
+                    }
+                    if nota.texto != relatoOriginal {
+                        DisclosureGroup("Ver relato original") {
+                            Text(relatoOriginal).font(.app(.body))
+                        }
                     }
                 }
             }

@@ -60,9 +60,10 @@ struct FridaView: View {
             ContactosEmergenciaView(familiarID: persona.id, nombre: persona.nombre, puedeEditar: false)
         }
         .sheet(isPresented: $mostrarNota, onDismiss: { notaParaRevisar = nil }) {
-            if let notaParaRevisar {
+            if let notaParaRevisar, let relato {
                 RevisarNotaFridaView(
-                    nota: notaParaRevisar, personas: diariosDisponibles, personaInicial: diarioInicial
+                    nota: notaParaRevisar, relatoOriginal: relato.fragmentos.resumen(seleccion: nil),
+                    personas: diariosDisponibles, personaInicial: diarioInicial
                 ) { persona in
                     self.relato = nil
                     escuchaSinApuro = false
@@ -399,9 +400,9 @@ struct FridaView: View {
         ejecutar {
             if familiares.familiares.isEmpty { await familiares.cargar() }
             try Task.checkCancellation()
-            let resumen = try? await FridaDiario.resumir(relato.nota.texto)
+            let seleccion = try? await FridaDiario.seleccionarResumen(relato.fragmentos)
             try Task.checkCancellation()
-            notaParaRevisar = relato.notaParaRevision(resumen: resumen)
+            notaParaRevisar = relato.notaParaRevision(seleccion: seleccion)
             mostrarNota = true
         }
     }
@@ -462,7 +463,7 @@ struct FridaView: View {
                 return
             }
 
-            let pregunta = escuchaSinApuro ? nil : actualizado.elegirPregunta(orientacion)?.pregunta
+            let pregunta = escuchaSinApuro ? nil : actualizado.elegirPregunta(orientacion, ultimoMensaje: ultimoMensaje)?.pregunta
             relato = actualizado
             let reflexion = orientacion.respuesta(para: ultimoMensaje)
             let previa = mensajes.last { !$0.delUsuario }?.texto ?? ""
