@@ -9,11 +9,14 @@ enum FridaDiario {
         @Guide(description: "Un código del tema principal: alimentacion, sueno, animo, incidencia, otro o ninguno.")
         var categoria: String
 
-        @Guide(description: "Una pregunta o detalle: hora, duracion, lugar, quePaso, comoSeSintio, queAyudo o ninguno.")
+        @Guide(description: "Una pregunta o detalle: hora, duracion, lugar, quePaso, comoSeSintio, queAyudo, quePesa o ninguno.")
         var detalle: String
 
         @Guide(description: "Tono de respuesta según lo que dijo la persona: dificil, alegre o neutral.")
         var tono: String
+
+        @Guide(description: "Tema del último mensaje: dinero, familia, responsabilidades, soledad o ninguno.")
+        var temaEscucha: String
     }
 
     @Generable
@@ -23,7 +26,7 @@ enum FridaDiario {
     }
 
     static func sugerir(
-        para nota: String, yaPreguntados: Set<SugerenciaNotaFrida.Detalle>
+        para nota: String, ultimoMensaje: String, yaPreguntados: Set<SugerenciaNotaFrida.Detalle>
     ) async throws -> SugerenciaNotaFrida? {
         let modelo = SystemLanguageModel.default
         guard case .available = modelo.availability else { return nil }
@@ -40,7 +43,10 @@ enum FridaDiario {
             Selecciona un dato observable que falte y que sea natural preguntar para completar el registro:
             hora si falta cuándo ocurrió, duracion si falta cuánto duró, lugar si falta dónde pasó,
             quePaso para invitar a contar qué ocurrió, comoSeSintio para preguntar cómo lo vivió,
-            queAyudo para preguntar si algo le ayudó, o ninguno si ya no hace falta preguntar.
+            queAyudo para preguntar si algo le ayudó, quePesa si expresó una preocupación concreta,
+            o ninguno si solo quiere que le escuchen o ya no hace falta preguntar.
+            Escoge el tema de escucha con base en el último mensaje. Si alguien habla del dinero
+            o de sus obligaciones, apóyate en eso y evita volver a preguntarle qué pasó.
             Si la persona empieza con «hoy tuve un día difícil», elige dificil y quePaso.
             Usa alegre solo si la persona expresó que algo le gustó o le dio alegría.
             Por ejemplo, si la nota dice que salieron a caminar, selecciona duracion o lugar si falta ese dato.
@@ -53,9 +59,11 @@ enum FridaDiario {
         let respuesta = try await sesion.respond(
             to: """
             Detalles ya preguntados: \(anteriores.isEmpty ? "ninguno" : anteriores).
-            Clasifica esta nota del diario de cuidado.
-
+            Relato hasta ahora:
             \(nota)
+
+            Último mensaje:
+            \(ultimoMensaje)
             """,
             generating: Respuesta.self
         )
@@ -64,7 +72,8 @@ enum FridaDiario {
             detalle: respuesta.content.detalle,
             tono: respuesta.content.tono,
             yaPreguntados: yaPreguntados,
-            esRelato: respuesta.content.esRelato
+            esRelato: respuesta.content.esRelato,
+            temaEscucha: respuesta.content.temaEscucha
         )
     }
 

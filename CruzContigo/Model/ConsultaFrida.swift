@@ -11,6 +11,7 @@ struct ConsultaFrida: Equatable {
 
     init?(_ texto: String, sugerirContactos: (String) -> Bool = { _ in false }) {
         let palabras = Self.palabras(texto)
+        let esContacto = IntencionEscuchaFrida.solicitaContacto(texto)
         let medicamentos: Set<String> = ["medicamentos", "medicamento", "medicinas", "medicina",
                                          "tratamientos", "tratamiento", "pastillas", "pastilla"]
         let recordatorios: Set<String> = ["recordatorios", "recordatorio", "avisos", "aviso", "alertas", "alerta", "citas", "cita"]
@@ -21,7 +22,7 @@ struct ConsultaFrida: Equatable {
         switch (med, rec) {
         case _ where Self.contiene("contactos de emergencia", en: palabras)
             || Self.contiene("contacto de emergencia", en: palabras):
-            guard !Self.rechazaContactos(palabras) else { return nil }
+            guard esContacto, !Self.rechazaContactos(palabras) else { return nil }
             tema = .contactosEmergencia
         case let (m?, r?) where r < m && palabras[(r + 1)..<m].contains(where: { ["de", "para"].contains($0) }):
             tema = .recordatorios
@@ -34,7 +35,7 @@ struct ConsultaFrida: Equatable {
         case (nil, nil) where Self.contiene("que tengo", en: palabras)
             && palabras.contains(where: { ["hoy", "manana"].contains($0) }):
             tema = .recordatorios
-        case (nil, nil) where !Self.rechazaContactos(palabras) && sugerirContactos(texto):
+        case (nil, nil) where esContacto && !Self.rechazaContactos(palabras) && sugerirContactos(texto):
             tema = .contactosEmergencia
         default:
             return nil

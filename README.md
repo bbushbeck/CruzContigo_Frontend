@@ -39,6 +39,11 @@ En **Revisar resumen** puedes editar el resumen generado por Apple Intelligence
 y revisar quién podrá leerlo. **Guardar en diario** envía la nota a la API con
 tu sesión.
 
+Si le dices a Frida que quieres seguir platicando, respeta ese ritmo. Las
+expresiones explícitas de peligro abren opciones de apoyo para México sin
+iniciar llamadas. Para riesgo de hacerse daño, la app muestra 911, Línea
+de la Vida y los contactos de emergencia disponibles en la cuenta.
+
 ## Red de cuidado, contactos y diario
 
 - **Red de cuidado (HU-17, HU-26):** invita por teléfono o con un código de un solo uso (`cruzcontigo://invitacion/CODIGO`, registrado en `CruzContigo-Info.plist`) con rol administrador, cocuidador, solo lectura o temporal. El acceso temporal vence solo y no ve la ficha médica salvo que se permita.

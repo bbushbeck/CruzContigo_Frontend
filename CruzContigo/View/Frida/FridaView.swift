@@ -16,6 +16,8 @@ struct FridaView: View {
     @State private var mostrarNota = false
     @State private var notaParaRevisar: SolicitudNota?
     @State private var esperaDecisionDeResumen = false
+    @State private var escuchaSinApuro = false
+    @State private var apoyoActivo: ApoyoFrida?
     @State private var contactosDe: Familiar?
     @State private var porResolver: ConsultaFrida?
     @State private var opciones: [Familiar] = []
@@ -31,11 +33,13 @@ struct FridaView: View {
         let texto: String
         var delUsuario = false
         var destino: Destino?
+        var apoyo: ApoyoFrida?
 
-        init(_ texto: String, delUsuario: Bool = false, destino: Destino? = nil) {
+        init(_ texto: String, delUsuario: Bool = false, destino: Destino? = nil, apoyo: ApoyoFrida? = nil) {
             self.texto = texto
             self.delUsuario = delUsuario
             self.destino = destino
+            self.apoyo = apoyo
         }
     }
 
@@ -61,6 +65,7 @@ struct FridaView: View {
                     nota: notaParaRevisar, personas: diariosDisponibles, personaInicial: diarioInicial
                 ) { persona in
                     self.relato = nil
+                    escuchaSinApuro = false
                     mensajes.append(Mensaje(
                         "Guardé la nota en el diario de \(persona.nombreCompleto).",
                         destino: .pantalla(.modulo(.diario, familiarID: persona.id))
@@ -96,7 +101,7 @@ struct FridaView: View {
                     }
                     if consultaActiva != nil {
                         ProgressView("Preparando la consulta…")
-                    } else if relato?.muestraOferta == true {
+                    } else if apoyoActivo == nil, relato?.muestraOferta == true {
                         accionesDelRelato
                     }
                     Color.clear.frame(height: 1).id("fin").accessibilityHidden(true)
@@ -128,6 +133,9 @@ struct FridaView: View {
                 .font(.app(.body))
                 .textSelection(.enabled)
 
+            if let apoyo = mensaje.apoyo {
+                opcionesDeApoyo(apoyo)
+            }
             if let destino = mensaje.destino {
                 Button {
                     abrirDestino(destino)
@@ -141,6 +149,55 @@ struct FridaView: View {
         .padding(14)
         .background(mensaje.delUsuario ? Color.rellenoSuave : Color.tintaSuave, in: RoundedRectangle(cornerRadius: 18))
         .frame(maxWidth: .infinity, alignment: mensaje.delUsuario ? .trailing : .leading)
+    }
+
+    private func opcionesDeApoyo(_ apoyo: ApoyoFrida) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let telefono = URL(string: "tel:911") {
+                Link(destination: telefono) {
+                    Label("Llamar al 911 · México", systemImage: "phone.fill")
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            if apoyo == .hacerseDano, let telefono = URL(string: "tel:8009112000") {
+                Link(destination: telefono) {
+                    Label("Línea de la Vida · 800 911 2000", systemImage: "phone")
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+            }
+            if !familiaresParaApoyo.isEmpty {
+                Button(action: mostrarContactosDeApoyo) {
+                    Label("Ver contactos de emergencia", systemImage: "person.crop.circle")
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private var familiaresParaApoyo: [Familiar] {
+        familiares.familiares.filter { persona in
+            !persona.esProfesional && (persona.accesoVenceEn.map { $0 > .now } ?? true)
+        }
+    }
+
+    private func mostrarContactosDeApoyo() {
+        let disponibles = familiaresParaApoyo
+        let puedeElegirTitular = rolUsuario == UserRole.recibeCuidados.rawValue
+        let propios = disponibles.filter { $0.rol == RolAcceso.titular.rawValue }
+        let preferida = puedeElegirTitular
+            ? (propios.count == 1 ? propios.first : nil)
+            : disponibles.first { $0.id == familiarSeleccionado }
+
+        if let preferida {
+            contactosDe = preferida
+        } else if disponibles.count == 1 {
+            contactosDe = disponibles.first
+        } else if !disponibles.isEmpty, let consulta = ConsultaFrida("Ver contactos de emergencia") {
+            pedirFamiliar(consulta, opciones: disponibles, mensaje: "¿De quién quieres ver los contactos?")
+        }
     }
 
     private var entrada: some View {
@@ -184,7 +241,8 @@ struct FridaView: View {
                         .frame(width: 44, height: 44)
                 }
                 .accessibilityLabel("Enviar mensaje")
-                .disabled(textoLimpio.isEmpty || consultaActiva != nil || dictado.estado != .listo)
+                .disabled(textoLimpio.isEmpty || dictado.estado != .listo
+                          || (consultaActiva != nil && ApoyoFrida.detectar(en: textoLimpio) == nil))
             }
         }
         .padding(.horizontal, 10)
@@ -198,18 +256,60 @@ struct FridaView: View {
 
     private func enviar() {
         let texto = textoLimpio
-        guard !texto.isEmpty, consultaActiva == nil else { return }
+        guard !texto.isEmpty else { return }
+        let apoyoDetectado = ApoyoFrida.detectar(en: texto)
+        guard consultaActiva == nil || apoyoDetectado != nil else { return }
         borrador = ""
         escribiendo = false
         mensajes.append(Mensaje(texto, delUsuario: true))
         let respondiaAOferta = esperaDecisionDeResumen
         esperaDecisionDeResumen = false
 
+        let palabras = ConsultaFrida.palabras(texto).joined(separator: " ")
+        if let apoyo = apoyoDetectado {
+            consultaActiva?.cancel()
+            apoyoActivo = apoyo
+            escuchaSinApuro = true
+            relato?.descartarOferta()
+            porResolver = nil
+            opciones = []
+            mensajes.append(Mensaje(apoyo.mensaje, apoyo: apoyo))
+            return
+        }
+        if let apoyoActivo {
+            if ["estoy a salvo", "ya estoy a salvo", "ya me estan atendiendo", "ya me estan ayudando"].contains(palabras) {
+                self.apoyoActivo = nil
+                mensajes.append(Mensaje("Gracias por contármelo. Si quieres seguir hablando, te leo."))
+            } else if IntencionEscuchaFrida.solicitaContacto(texto) {
+                mostrarContactosDeApoyo()
+            } else {
+                mensajes.append(Mensaje(
+                    "Te leo. Si puedes, busca a alguien de confianza que pueda estar contigo.",
+                    apoyo: apoyoActivo
+                ))
+            }
+            return
+        }
+
+        if IntencionEscuchaFrida.pideEscucha(texto) || IntencionEscuchaFrida.rechazaContactos(texto) {
+            escuchaSinApuro = true
+            relato?.descartarOferta()
+            porResolver = nil
+            opciones = []
+            if IntencionEscuchaFrida.soloPideEscucha(texto) {
+                mensajes.append(Mensaje("Claro. Tómate tu tiempo, te estoy escuchando."))
+            } else if relato != nil {
+                seguirRelato(texto)
+            } else {
+                iniciarRelato(texto, esCotidiano: true)
+            }
+            return
+        }
+
         if ConsultaFrida.pideConsejoMedico(texto) {
             mensajes.append(Mensaje("Puedo mostrar los medicamentos registrados. Para indicaciones o cambios de dosis, consulta al equipo de salud."))
             return
         }
-        let palabras = ConsultaFrida.palabras(texto).joined(separator: " ")
         if ["hola", "buenos dias", "buenas tardes", "buenas noches"].contains(palabras) {
             mensajes.append(Mensaje("Hola. ¿Qué te gustaría contarme hoy?"))
             return
@@ -286,6 +386,7 @@ struct FridaView: View {
     private var descartarNota: some View {
         Button("Descartar borrador") {
             relato = nil
+            escuchaSinApuro = false
             esperaDecisionDeResumen = false
             mensajes.append(Mensaje("Está bien. Podemos hablar de otra cosa."))
         }
@@ -294,7 +395,7 @@ struct FridaView: View {
     }
 
     private func prepararRevisionDeNota() {
-        guard let relato else { return }
+        guard apoyoActivo == nil, let relato else { return }
         ejecutar {
             if familiares.familiares.isEmpty { await familiares.cargar() }
             try Task.checkCancellation()
@@ -330,8 +431,8 @@ struct FridaView: View {
 
     private func seguirRelato(_ texto: String) {
         guard var borrador = relato, borrador.agregar(texto) else {
-            mensajes.append(Mensaje("Este relato ya es bastante largo. Si quieres, puedo preparar un resumen para el diario."))
-            _ = relato?.ofrecerResumen(alCerrar: true)
+            mensajes.append(Mensaje("Este mensaje es largo para una sola nota. Te leo si quieres seguir platicando."))
+            if !escuchaSinApuro { _ = relato?.ofrecerResumen(alCerrar: true) }
             return
         }
         responderAlRelato(borrador, ultimoMensaje: texto, esRelatoConocido: true)
@@ -342,7 +443,8 @@ struct FridaView: View {
     ) {
         ejecutar {
             let sugerencia = try? await FridaDiario.sugerir(
-                para: borrador.nota.texto, yaPreguntados: borrador.detallesPreguntados
+                para: borrador.nota.texto, ultimoMensaje: ultimoMensaje,
+                yaPreguntados: borrador.detallesPreguntados
             )
             try Task.checkCancellation()
             guard esRelatoConocido || sugerencia?.esRelato == true else {
@@ -353,16 +455,19 @@ struct FridaView: View {
             var actualizado = borrador
             let orientacion = sugerencia.flatMap { $0.esRelato ? $0 : nil }
                 ?? borrador.sugerenciaLocal(ultimoMensaje: ultimoMensaje)
-            if actualizado.ofrecerResumen() {
+            if !escuchaSinApuro, !orientacion.convieneSeguirEscuchando(ultimoMensaje),
+               actualizado.ofrecerResumen() {
                 relato = actualizado
                 ofrecerResumen()
                 return
             }
 
-            let pregunta = actualizado.elegirPregunta(orientacion)?.pregunta
+            let pregunta = escuchaSinApuro ? nil : actualizado.elegirPregunta(orientacion)?.pregunta
             relato = actualizado
-            let respuesta = [orientacion.tono.respuesta, pregunta].compactMap { $0 }.joined(separator: " ")
-            mensajes.append(Mensaje(respuesta))
+            let reflexion = orientacion.respuesta(para: ultimoMensaje)
+            let previa = mensajes.last { !$0.delUsuario }?.texto ?? ""
+            let respuesta = previa.hasPrefix(reflexion) ? "Puedes contarme más, a tu ritmo." : reflexion
+            mensajes.append(Mensaje([respuesta, pregunta].compactMap { $0 }.joined(separator: " ")))
         }
     }
 

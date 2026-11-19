@@ -2,7 +2,7 @@ import Foundation
 
 struct SugerenciaNotaFrida: Equatable {
     enum Detalle: String {
-        case hora, duracion, lugar, quePaso, comoSeSintio, queAyudo
+        case hora, duracion, lugar, quePaso, comoSeSintio, queAyudo, quePesa
 
         var pregunta: String {
             switch self {
@@ -12,6 +12,7 @@ struct SugerenciaNotaFrida: Equatable {
             case .quePaso: "¿Qué pasó?"
             case .comoSeSintio: "¿Cómo te sentiste en ese momento?"
             case .queAyudo: "¿Hubo algo que te ayudó ese día?"
+            case .quePesa: "¿Qué es lo que más te preocupa ahora?"
             }
         }
     }
@@ -28,16 +29,65 @@ struct SugerenciaNotaFrida: Equatable {
         }
     }
 
+    enum TemaEscucha: String {
+        case dinero, familia, responsabilidades, soledad, ninguno
+
+        var respuesta: String? {
+            switch self {
+            case .dinero: "La preocupación por el dinero puede pesar mucho."
+            case .familia: "Te leo. Esto que cuentas sobre tu familia importa."
+            case .responsabilidades: "Suena a que traes varias cosas encima."
+            case .soledad: "Gracias por contarme cómo te has sentido."
+            case .ninguno: nil
+            }
+        }
+
+        static func reconocer(_ texto: String) -> TemaEscucha {
+            let textoNormalizado = ConsultaFrida.palabras(texto)
+            let palabras = Set(textoNormalizado)
+            if !palabras.isDisjoint(with: ["dinero", "deuda", "deudas", "pagar", "renta", "gastarlo", "gastamos"]) {
+                return .dinero
+            }
+            if !palabras.isDisjoint(with: ["soledad", "acompanado", "acompanada"])
+                || ConsultaFrida.contiene("me siento sola", en: textoNormalizado)
+                || ConsultaFrida.contiene("me siento solo", en: textoNormalizado) {
+                return .soledad
+            }
+            if !palabras.isDisjoint(with: ["familia", "hijos", "hijas", "hijo", "hija"]) {
+                return .familia
+            }
+            if !palabras.isDisjoint(with: ["pendientes", "responsabilidades", "trabajo", "tareas"]) {
+                return .responsabilidades
+            }
+            return .ninguno
+        }
+    }
+
     let esRelato: Bool
     let categoria: CategoriaNota?
     let detalle: Detalle?
     let tono: Tono
+    let temaEscucha: TemaEscucha
 
-    init(categoria: String, detalle: String, tono: String, yaPreguntados: Set<Detalle>, esRelato: Bool = true) {
+    init(
+        categoria: String, detalle: String, tono: String, yaPreguntados: Set<Detalle>,
+        esRelato: Bool = true, temaEscucha: String = ""
+    ) {
         self.esRelato = esRelato
         self.categoria = CategoriaNota(rawValue: categoria)
         self.detalle = Detalle(rawValue: detalle).flatMap { yaPreguntados.contains($0) ? nil : $0 }
         self.tono = Tono(rawValue: tono) ?? .neutral
+        self.temaEscucha = TemaEscucha(rawValue: temaEscucha) ?? .ninguno
+    }
+
+    func convieneSeguirEscuchando(_ ultimoMensaje: String) -> Bool {
+        let temaLocal = TemaEscucha.reconocer(ultimoMensaje)
+        return tono == .dificil || [.dinero, .soledad].contains(temaLocal)
+    }
+
+    func respuesta(para ultimoMensaje: String) -> String {
+        let temaLocal = TemaEscucha.reconocer(ultimoMensaje)
+        return temaLocal.respuesta ?? temaEscucha.respuesta ?? tono.respuesta
     }
 }
 
@@ -92,10 +142,13 @@ struct BorradorDiarioFrida {
         let palabras = Set(ConsultaFrida.palabras(nota.texto))
         let ultimas = Set(ConsultaFrida.palabras(ultimoMensaje))
         let paseo = !palabras.isDisjoint(with: ["caminar", "camine", "camino", "caminamos", "paseo", "pasear", "paseamos"])
+        let tema = SugerenciaNotaFrida.TemaEscucha.reconocer(ultimoMensaje)
         let dificil = !ultimas.isDisjoint(with: ["dificil", "pesado", "complicado", "triste", "sola", "solo", "dificiles"])
         let temas: [SugerenciaNotaFrida.Detalle]
         if paseo {
             temas = [.duracion, .lugar, .comoSeSintio]
+        } else if tema == .dinero || tema == .responsabilidades {
+            temas = [.quePesa, .queAyudo, .comoSeSintio]
         } else if dificil {
             temas = [.quePaso, .queAyudo, .comoSeSintio]
         } else {
@@ -104,7 +157,8 @@ struct BorradorDiarioFrida {
         let siguiente = temas.first { !detallesPreguntados.contains($0) }
         return SugerenciaNotaFrida(
             categoria: "", detalle: siguiente?.rawValue ?? "",
-            tono: dificil ? "dificil" : "neutral", yaPreguntados: detallesPreguntados
+            tono: dificil ? "dificil" : "neutral", yaPreguntados: detallesPreguntados,
+            temaEscucha: tema.rawValue
         )
     }
 
