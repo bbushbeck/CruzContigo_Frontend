@@ -445,12 +445,12 @@ struct FridaView: View {
         try await cargarFamiliaresSiHaceFalta()
         let coincidencias = ConsultaFrida.coincidencias(texto, familiares: familiares.familiares)
         let persona = coincidencias.count == 1 ? coincidencias.first : nil
-        let aQuien = persona.map { " a ($0.nombre)" } ?? ""
+        let aQuien = persona.map { " a \($0.nombre)" } ?? ""
         let destino = persona.flatMap { persona in
             familiaresParaApoyo.contains { $0.id == persona.id } ? Destino.contactos(persona) : nil
         }
         mensajes.append(Mensaje(
-            "¿Qué necesitas para ayudar(aQuien)? Puedo orientarte hacia los contactos de emergencia, los recordatorios o los medicamentos registrados.",
+            "¿Qué necesitas para ayudar\(aQuien)? Puedo orientarte hacia los contactos de emergencia, los recordatorios o los medicamentos registrados.",
             destino: destino
         ))
     }
