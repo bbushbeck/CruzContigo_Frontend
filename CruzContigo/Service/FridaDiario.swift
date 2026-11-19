@@ -2,7 +2,7 @@ import FoundationModels
 
 enum FridaDiario {
     @Generable
-    private struct Respuesta {
+    fileprivate struct Respuesta {
         @Guide(description: "Si el mensaje relata una vivencia, actividad u observación del día o expresa cómo se sintió la persona.")
         var esRelato: Bool
 
