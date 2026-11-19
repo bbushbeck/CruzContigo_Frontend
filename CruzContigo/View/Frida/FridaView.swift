@@ -15,6 +15,7 @@ struct FridaView: View {
     @State private var relato: BorradorDiarioFrida?
     @State private var mostrarNota = false
     @State private var notaParaRevisar: SolicitudNota?
+    @State private var personaParaRevisar: UUID?
     @State private var esperaDecisionDeResumen = false
     @State private var escuchaSinApuro = false
     @State private var apoyoActivo: ApoyoFrida?
@@ -63,15 +64,9 @@ struct FridaView: View {
             if let notaParaRevisar, let relato {
                 RevisarNotaFridaView(
                     nota: notaParaRevisar, relatoOriginal: relato.fragmentos.resumen(seleccion: nil),
-                    personas: diariosDisponibles, personaInicial: diarioInicial
-                ) { persona in
-                    self.relato = nil
-                    escuchaSinApuro = false
-                    mensajes.append(Mensaje(
-                        "Guardé la nota en el diario de \(persona.nombreCompleto).",
-                        destino: .pantalla(.modulo(.diario, familiarID: persona.id))
-                    ))
-                }
+                    personas: diariosDisponibles, personaInicial: personaParaRevisar,
+                    alGuardar: confirmarNotaGuardada
+                )
             }
         }
         .onChange(of: dictado.transcripcion) { _, texto in
@@ -291,6 +286,10 @@ struct FridaView: View {
             }
             return
         }
+        if let pedido = PedidoDiarioFrida(texto) {
+            interpretarMensaje(texto, pedido: pedido)
+            return
+        }
 
         if IntencionEscuchaFrida.pideEscucha(texto) || IntencionEscuchaFrida.rechazaContactos(texto) {
             escuchaSinApuro = true
@@ -313,9 +312,8 @@ struct FridaView: View {
             mensajes.append(Mensaje("Hola. ¿Qué te gustaría contarme hoy?"))
             return
         }
-        if relato != nil,
-           BorradorDiarioFrida.pideGuardar(texto)
-            || (respondiaAOferta && ["si", "si por favor", "si gracias", "claro", "adelante"].contains(palabras)) {
+        if relato != nil, respondiaAOferta,
+           ["si", "si por favor", "si gracias", "claro", "adelante"].contains(palabras) {
             prepararRevisionDeNota()
             return
         }
@@ -337,15 +335,20 @@ struct FridaView: View {
         interpretarMensaje(texto)
     }
 
-    private func interpretarMensaje(_ texto: String, soloEscuchar: Bool = false) {
+    private func interpretarMensaje(
+        _ texto: String, soloEscuchar: Bool = false, pedido: PedidoDiarioFrida? = nil
+    ) {
         let relatoPrevio = relato
         ejecutar {
             let interpretacion = try? await FridaDiario.interpretar(
-                ultimoMensaje: texto, relato: relatoPrevio?.nota.texto,
-                yaPreguntados: relatoPrevio?.detallesPreguntados ?? []
+                ultimoMensaje: texto, relato: relatoPrevio
             )
             try Task.checkCancellation()
 
+            if let pedido {
+                try await atenderPedidoDiario(pedido, orientacion: interpretacion?.orientacion)
+                return
+            }
             if soloEscuchar {
                 registrarRelato(texto, orientacion: interpretacion?.orientacion)
                 return
@@ -355,8 +358,12 @@ struct FridaView: View {
                 responderConsejoMedico()
                 return
             }
-            if let relatoPrevio, interpretacion?.autorizaRevision(texto) == true {
-                try await mostrarRevisionDeNota(relatoPrevio)
+            if interpretacion?.autorizaRevision(texto) == true {
+                if let relatoPrevio {
+                    try await prepararNota(relatoPrevio)
+                } else {
+                    mensajes.append(Mensaje("Cuéntame qué quieres anotar en el diario."))
+                }
                 return
             }
 
@@ -427,16 +434,75 @@ struct FridaView: View {
 
     private func prepararRevisionDeNota() {
         guard apoyoActivo == nil, let relato else { return }
-        ejecutar { try await mostrarRevisionDeNota(relato) }
+        ejecutar { try await prepararNota(relato) }
     }
 
-    private func mostrarRevisionDeNota(_ relato: BorradorDiarioFrida) async throws {
+    private func atenderPedidoDiario(_ pedido: PedidoDiarioFrida, orientacion: SugerenciaNotaFrida?) async throws {
+        var actualizado = relato
+        if let contenido = pedido.contenido {
+            guard contenido.count <= SolicitudNota.largoMaximo else {
+                mensajes.append(Mensaje("La nota admite hasta \(SolicitudNota.largoMaximo) caracteres."))
+                return
+            }
+            if var previo = actualizado {
+                guard previo.agregar(contenido) else {
+                    mensajes.append(Mensaje("Ese detalle rebasa el límite de la nota. Puedes revisar el borrador desde aquí."))
+                    _ = relato?.ofrecerResumen(alCerrar: true)
+                    return
+                }
+                actualizado = previo
+            } else {
+                actualizado = BorradorDiarioFrida(texto: contenido)
+            }
+            if let sugerencia = orientacion ?? actualizado?.sugerenciaLocal(ultimoMensaje: contenido) {
+                actualizado?.actualizarCategoria(sugerencia, ultimoMensaje: contenido)
+            }
+        }
+        guard let actualizado else {
+            mensajes.append(Mensaje("Cuéntame qué quieres anotar en el diario."))
+            return
+        }
+        porResolver = nil
+        opciones = []
+        relato = actualizado
+        try await prepararNota(actualizado, pedido: pedido)
+    }
+
+    private func prepararNota(_ relato: BorradorDiarioFrida, pedido: PedidoDiarioFrida? = nil) async throws {
         if familiares.familiares.isEmpty { await familiares.cargar() }
         try Task.checkCancellation()
         let seleccion = try? await FridaDiario.seleccionarResumen(relato.fragmentos)
         try Task.checkCancellation()
-        notaParaRevisar = relato.notaParaRevision(seleccion: seleccion)
+        let nota = relato.notaParaRevision(seleccion: seleccion)
+        let destino = pedido.flatMap {
+            $0.destinoUnico(
+                relato: relato.nota.texto, personas: familiares.familiares, diariosDisponibles: diariosDisponibles,
+                recibeCuidados: rolUsuario == UserRole.recibeCuidados.rawValue
+            )
+        }
+        if pedido?.accion == .guardar, let destino, nota.esValida {
+            do {
+                _ = try await Repositorios.diario().crear(nota, familiarID: destino.id)
+                confirmarNotaGuardada(destino)
+            } catch {
+                guard !Task.isCancelled else { return }
+                mensajes.append(Mensaje("No pude guardar la nota. El borrador sigue aquí. \(error.localizedDescription)"))
+            }
+            return
+        }
+        personaParaRevisar = destino?.id ?? (pedido?.accion == .guardar ? nil : diarioInicial)
+        notaParaRevisar = nota
         mostrarNota = true
+    }
+
+    private func confirmarNotaGuardada(_ persona: Familiar) {
+        relato = nil
+        escuchaSinApuro = apoyoActivo != nil
+        esperaDecisionDeResumen = false
+        mensajes.append(Mensaje(
+            "Guardé la nota en el diario de \(persona.nombreCompleto).",
+            destino: .pantalla(.modulo(.diario, familiarID: persona.id))
+        ))
     }
 
     private var diariosDisponibles: [Familiar] {
@@ -466,20 +532,21 @@ struct FridaView: View {
             return
         }
 
-        let sugerencia = orientacion.flatMap { $0.esRelato ? $0 : nil }
-            ?? actualizado.sugerenciaLocal(ultimoMensaje: texto)
+        let delModelo = orientacion.flatMap { $0.esRelato ? $0 : nil }
+        let sugerencia = delModelo ?? actualizado.sugerenciaLocal(ultimoMensaje: texto)
+        actualizado.actualizarCategoria(sugerencia, ultimoMensaje: texto)
         if !escuchaSinApuro, !sugerencia.convieneSeguirEscuchando(texto), actualizado.ofrecerResumen() {
             relato = actualizado
             ofrecerResumen()
             return
         }
 
-        let pregunta = escuchaSinApuro ? nil : actualizado.elegirPregunta(sugerencia, ultimoMensaje: texto)?.pregunta
+        let pregunta = escuchaSinApuro ? nil : actualizado.elegirPregunta(
+            sugerencia, ultimoMensaje: texto, sugeridaPorModelo: delModelo != nil
+        )
+        let respuesta = actualizado.responder(sugerencia, texto: texto, pregunta: pregunta)
         relato = actualizado
-        let reflexion = sugerencia.respuesta(para: texto)
-        let previa = mensajes.last { !$0.delUsuario }?.texto ?? ""
-        let respuesta = previa.hasPrefix(reflexion) ? "Puedes contarme más, a tu ritmo." : reflexion
-        mensajes.append(Mensaje([respuesta, pregunta].compactMap { $0 }.joined(separator: " ")))
+        if !respuesta.isEmpty { mensajes.append(Mensaje(respuesta)) }
     }
 
     private func ofrecerResumen() {

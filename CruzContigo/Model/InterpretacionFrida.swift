@@ -3,7 +3,7 @@ import Foundation
 struct InterpretacionFrida {
     enum Intencion: String {
         case medicamentos, recordatorios, contactosEmergencia
-        case relato, prepararDiario, consejoMedico, otro
+        case relato, guardarDiario, prepararDiario, consejoMedico, otro
     }
 
     let intencion: Intencion
@@ -54,7 +54,8 @@ struct InterpretacionFrida {
     ) -> ConsultaFrida? {
         guard !BorradorDiarioFrida.esRelatoCotidiano(texto),
               !contandoRelato || BorradorDiarioFrida.esConsultaExplicita(texto),
-              modelo?.intencion != .consejoMedico, modelo?.intencion != .prepararDiario else { return nil }
+              modelo?.intencion != .consejoMedico,
+              modelo?.intencion != .prepararDiario, modelo?.intencion != .guardarDiario else { return nil }
 
         if let consulta = modelo?.consulta(para: texto, contandoRelato: contandoRelato) {
             return consulta
@@ -64,11 +65,13 @@ struct InterpretacionFrida {
     }
 
     func autorizaRevision(_ texto: String) -> Bool {
-        guard intencion == .prepararDiario, !BorradorDiarioFrida.esRelatoCotidiano(texto) else { return false }
+        guard [.prepararDiario, .guardarDiario].contains(intencion),
+              !BorradorDiarioFrida.esRelatoCotidiano(texto) else { return false }
         let palabras = ConsultaFrida.palabras(texto)
         guard !palabras.contains("no") else { return false }
-        let unPedido: Set<String> = ["resume", "resumir", "hazme", "prepara", "puedes", "quiero"]
-        let unResumen: Set<String> = ["resume", "resumir", "resumen", "nota", "diario"]
+        let unPedido: Set<String> = ["resume", "resumir", "hazme", "prepara", "puedes", "podrias", "quiero",
+                                     "apunta", "apuntalo", "deja"]
+        let unResumen: Set<String> = ["resume", "resumir", "resumen", "nota", "notas", "diario"]
         let terminos = Set(palabras)
         return !terminos.isDisjoint(with: unPedido) && !terminos.isDisjoint(with: unResumen)
     }

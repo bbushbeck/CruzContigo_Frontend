@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import CruzContigo
 
@@ -49,9 +50,9 @@ struct FridaDiarioTests {
         #expect(BorradorDiarioFrida.quiereCerrar("Eso es todo."))
         #expect(!BorradorDiarioFrida.quiereCerrar("No recuerdo."))
         #expect(BorradorDiarioFrida.quiereOmitir("No, gracias."))
-        #expect(BorradorDiarioFrida.pideGuardar("Guarda esto en mi diario."))
-        #expect(BorradorDiarioFrida.pideGuardar("Frida, guárdalo."))
-        #expect(!BorradorDiarioFrida.pideGuardar("Hoy guardé una nota en mi diario."))
+        #expect(PedidoDiarioFrida("Guarda esto en mi diario.")?.accion == .guardar)
+        #expect(PedidoDiarioFrida("Frida, guárdalo.")?.accion == .guardar)
+        #expect(PedidoDiarioFrida("Hoy guardé una nota en mi diario.") == nil)
         #expect(BorradorDiarioFrida.esConsultaExplicita("Muéstrame los medicamentos"))
         #expect(!BorradorDiarioFrida.esConsultaExplicita("Mi hija me acompañó a la cita."))
 
@@ -59,6 +60,56 @@ struct FridaDiarioTests {
         let ofreceAlCerrar = borrador.ofrecerResumen(alCerrar: true)
         #expect(ofreceAlCerrar)
         #expect(borrador.nota.texto == "Hoy me sentí bien.")
+    }
+
+    @Test(arguments: [
+        "Puedes guardar esto en notas",
+        "Qué lo guardes en notas",
+        "Guarda lo que te acabo de decir de Ana y su antojo en notas",
+        "Oye Frida, ¿podrías anotarlo en el diario?",
+        "Sí, guárdalo, por favor"
+    ])
+    func reconocePedidosDictadosSinIncluirLaOrdenEnLaNota(_ texto: String) {
+        let pedido = PedidoDiarioFrida(texto)
+        #expect(pedido?.accion == .guardar)
+        #expect(pedido?.contenido == nil)
+    }
+
+    @Test func separaElDatoNuevoDelPedidoDeGuardar() throws {
+        let dictado = try #require(PedidoDiarioFrida(
+            "Y creo que debería de anotarlo que no ha estado comiendo bien puedes guardarlo en notas"
+        ))
+        #expect(dictado.accion == .guardar)
+        #expect(dictado.contenido == "no ha estado comiendo bien")
+        #expect(dictado.referencia == "puedes guardarlo en notas")
+        #expect(PedidoDiarioFrida("No ha comido bien. ¿Puedes guardarlo en notas?")?.contenido == "No ha comido bien")
+        #expect(PedidoDiarioFrida("Anota en el diario que hoy salí a caminar.")?.contenido == "hoy salí a caminar.")
+        #expect(PedidoDiarioFrida("Anota que hoy salí a caminar.")?.contenido == "hoy salí a caminar.")
+        #expect(PedidoDiarioFrida("Hazme un resumen de lo que te conté")?.accion == .revisar)
+        #expect(PedidoDiarioFrida("No quiero que lo guardes en notas") == nil)
+        #expect(PedidoDiarioFrida("No te estoy pidiendo que lo guardes en notas") == nil)
+        #expect(PedidoDiarioFrida("Mi hermana me dijo que lo guardes en notas") == nil)
+        #expect(PedidoDiarioFrida("Ana guarda sus citas en el diario") == nil)
+        #expect(PedidoDiarioFrida("No sé cómo guardar esto en notas") == nil)
+        #expect(PedidoDiarioFrida("Guarda mis medicamentos") == nil)
+    }
+
+    @Test func guardarDirectoRequiereUnDiarioIdentificadoYDisponible() throws {
+        let ana = Familiar(nombre: "Ana", apellidos: "López", fechaNacimiento: .now, parentesco: .madre, tipoCuidado: .adultoMayor)
+        let eli = Familiar(nombre: "Eli", apellidos: "Gil", fechaNacimiento: .now, parentesco: .hermana, tipoCuidado: .adultoMayor)
+        let pedido = try #require(PedidoDiarioFrida("Puedes guardarlo en notas"))
+        #expect(pedido.destinoUnico(relato: "Ana no ha comido bien", personas: [ana, eli], diariosDisponibles: [ana, eli], recibeCuidados: false)?.id == ana.id)
+        #expect(pedido.destinoUnico(relato: "Ana y Eli salieron hoy", personas: [ana, eli], diariosDisponibles: [ana], recibeCuidados: false) == nil)
+        #expect(pedido.destinoUnico(relato: "Ana no ha comido bien", personas: [ana, eli], diariosDisponibles: [eli], recibeCuidados: false) == nil)
+        let destinoDistinto = try #require(PedidoDiarioFrida("Guárdalo en el diario de Sol"))
+        #expect(destinoDistinto.destinoUnico(relato: "Ana no ha comido bien", personas: [ana, eli], diariosDisponibles: [ana, eli], recibeCuidados: false) == nil)
+
+        var titular = eli
+        titular.rol = RolAcceso.titular.rawValue
+        let propio = try #require(PedidoDiarioFrida("Guárdalo en mi diario"))
+        #expect(propio.destinoUnico(relato: "Hoy salí a caminar", personas: [ana, titular], diariosDisponibles: [ana, titular], recibeCuidados: true)?.id == titular.id)
+        #expect(pedido.destinoUnico(relato: "Hoy salí a caminar", personas: [ana, titular], diariosDisponibles: [ana, titular], recibeCuidados: true)?.id == titular.id)
+        #expect(destinoDistinto.destinoUnico(relato: "Hoy salí a caminar", personas: [ana, titular], diariosDisponibles: [ana, titular], recibeCuidados: true) == nil)
     }
 
     @Test func elResumenConservaElTextoYElOrdenDelRelato() {
@@ -116,6 +167,44 @@ struct FridaDiarioTests {
         let otraPregunta = otroBorrador.elegirPregunta(preguntaDelModelo, ultimoMensaje: conDuracion)
         #expect(otraPregunta == .quePesa)
     }
+
+    @Test func usaLaConversacionCompletaParaEvitarPreguntarYResponderLoMismo() throws {
+        let inicial = "No ha estado comiendo bien últimamente en esta última semana"
+        let seguimiento = "Realmente no se le antoja nada y sí me preocupa mucho"
+        let aclaracion = "Según yo desde la última semana lleva así, no sé si lleva más tiempo"
+        let orientacion = SugerenciaNotaFrida(
+            categoria: "alimentacion", detalle: "desdeCuando", tono: "dificil",
+            yaPreguntados: [], temaEscucha: "alimentacion", enfoque: "reconocerDetalle"
+        )
+        var borrador = BorradorDiarioFrida(texto: inicial)
+        for (indice, mensaje) in [inicial, seguimiento, aclaracion].enumerated() {
+            if indice > 0 {
+                let agregado = borrador.agregar(mensaje)
+                try #require(agregado)
+            }
+            let pregunta = borrador.elegirPregunta(orientacion, ultimoMensaje: mensaje, sugeridaPorModelo: true)
+            #expect(pregunta == nil)
+            let respuesta = borrador.responder(orientacion, texto: mensaje, pregunta: pregunta)
+            #expect(!respuesta.isEmpty)
+        }
+        #expect(borrador.detallesCubiertos.contains(.desdeCuando))
+        #expect(borrador.detallesCubiertos.contains(.quePesa))
+        #expect(borrador.respuestasDadas.first?.contains("última semana") == true)
+        #expect(Set(borrador.respuestasDadas).count == 3)
+    }
+
+    #if canImport(FoundationModels)
+    @Test func adaptaLaOrientacionEstructuradaDeFoundationModels() {
+        let respuesta = OrientacionDelModeloFrida(
+            categoria: "alimentacion", detalle: "desdeCuando", tono: "dificil",
+            tema: "alimentacion", enfoque: "reconocerDetalle"
+        )
+        let orientacion = SugerenciaNotaFrida(respuesta, detallesCubiertos: [.desdeCuando], esRelato: true)
+        #expect(orientacion.categoria == .alimentacion)
+        #expect(orientacion.detalle == nil)
+        #expect(orientacion.enfoque == .reconocerDetalle)
+    }
+    #endif
 
     @Test func conservaPreguntasYRespuestasDentroDeLasOpcionesPermitidas() {
         let fueraDelEsquema = SugerenciaNotaFrida(

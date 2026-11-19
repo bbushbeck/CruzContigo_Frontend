@@ -3,7 +3,7 @@ import FoundationModels
 enum FridaDiario {
     @Generable
     fileprivate struct Respuesta {
-        @Guide(description: "Intención del último mensaje: medicamentos, recordatorios, contactosEmergencia, relato, prepararDiario, consejoMedico u otro.")
+        @Guide(description: "Intención del último mensaje: medicamentos, recordatorios, contactosEmergencia, relato, guardarDiario, prepararDiario, consejoMedico u otro.")
         var intencion: String
 
         @Guide(description: "Periodo de una consulta: todos, hoy, manana o proximos.")
@@ -18,17 +18,8 @@ enum FridaDiario {
         @Guide(description: "Nombre o parentesco mencionado en el último mensaje, tal como está escrito. Nil si no está.")
         var familiar: String?
 
-        @Guide(description: "Un código del tema principal: alimentacion, sueno, animo, incidencia, otro o ninguno.")
-        var categoria: String
-
-        @Guide(description: "Una pregunta o detalle: hora, duracion, lugar, quePaso, comoSeSintio, queAyudo, quePesa, desdeCuando o ninguno.")
-        var detalle: String
-
-        @Guide(description: "Tono de respuesta según lo que dijo la persona: dificil, alegre o neutral.")
-        var tono: String
-
-        @Guide(description: "Tema del último mensaje: dinero, alimentacion, familia, responsabilidades, soledad o ninguno.")
-        var temaEscucha: String
+        @Guide(description: "Orientación para responder al relato sin repetir información ni preguntas.")
+        var orientacion: OrientacionDelModeloFrida
     }
 
     @Generable
@@ -38,7 +29,7 @@ enum FridaDiario {
     }
 
     static func interpretar(
-        ultimoMensaje: String, relato: String?, yaPreguntados: Set<SugerenciaNotaFrida.Detalle>
+        ultimoMensaje: String, relato: BorradorDiarioFrida?
     ) async throws -> InterpretacionFrida? {
         let modelo = SystemLanguageModel.default
         guard ultimoMensaje.count <= SolicitudNota.largoMaximo,
@@ -52,7 +43,8 @@ enum FridaDiario {
             Usa abrir solo cuando pide ir a una pantalla; en otras consultas usa consultar.
             Para contactos debe pedir a quién llamar o pedir ver contactos. Un desahogo no es una petición
             de contactos. Usa consejoMedico si pide diagnóstico, tratamiento, dosis o consejo de salud.
-            Usa prepararDiario si solicita revisar o resumir su relato para el diario.
+            Usa guardarDiario si pide guardar o anotar el relato, incluso al final de un mensaje dictado.
+            Usa prepararDiario si pide revisar, leer o resumir su relato antes de guardarlo.
             Usa relato para vivencias, observaciones o cómo se siente la persona. Saludos y otras peticiones
             son otro. Si hay un relato en curso, las respuestas breves a preguntas de seguimiento son relato.
             Un relato puede mencionar medicamentos, citas o dinero sin pedir una consulta.
@@ -65,34 +57,40 @@ enum FridaDiario {
             «¿A quién le aviso si le pasa algo a mi abuela?» → contactosEmergencia, consultar, mi abuela.
             «Tengo deudas por los medicamentos de mi mamá y estoy triste» → relato, dinero, dificil.
             «Mi hermana últimamente come poco» → relato, alimentacion, desdeCuando.
+            «No ha comido bien en la última semana, ¿puedes guardarlo en notas?» → guardarDiario.
+            «Que lo guardes en notas» → guardarDiario.
             «Hazme un resumen de lo que te conté» → prepararDiario.
             «¿Le puedo aumentar la dosis?» → consejoMedico.
 
             Para un relato, elige categoria entre alimentacion, sueno, animo, incidencia, otro o ninguno.
-            Elige temaEscucha entre dinero, alimentacion, familia, responsabilidades, soledad o ninguno,
+            Elige tema entre dinero, alimentacion, familia, responsabilidades, soledad o ninguno,
             y tono entre dificil, alegre y neutral, con base en el último mensaje. No infieras síntomas.
             Elige una pregunta útil: hora, duracion, lugar, quePaso, comoSeSintio, queAyudo, quePesa,
-            desdeCuando o ninguno. Si un familiar ha comido poco últimamente, usa desdeCuando solo si
-            aún falta saberlo. Evita preguntas repetidas y usa ninguno si pide que solo le escuchen.
+            desdeCuando o ninguno. Revisa todo el relato: «esta última semana» ya aclara desde cuándo.
+            No preguntes algo respondido, aunque la persona lo haya dicho antes de que le preguntaran.
+            Si ya explicó su preocupación o acaba de precisar un detalle, puedes reconocerlo y usar
+            ninguno. No repitas las respuestas recientes. Usa darEspacio si pide que solo le escuchen.
             """)
-        let anteriores = yaPreguntados.map(\.rawValue).sorted().joined(separator: ", ")
+        let cubiertos = relato?.detallesCubiertos ?? []
+        let anteriores = cubiertos.map(\.rawValue).sorted().joined(separator: ", ")
+        let respuestas = relato?.respuestasDadas.suffix(4).joined(separator: "\n") ?? ""
         let respuesta = try await sesion.respond(
             to: """
-            Detalles ya preguntados: \(anteriores.isEmpty ? "ninguno" : anteriores).
-            Relato previo: \(relato ?? "ninguno").
+            Detalles ya expresados o preguntados: \(anteriores.isEmpty ? "ninguno" : anteriores).
+            Respuestas recientes de Frida: \(respuestas.isEmpty ? "ninguna" : respuestas).
+            Relato previo: \(relato?.nota.texto ?? "ninguno").
 
             Último mensaje de la persona:
             \(ultimoMensaje)
             """,
             generating: Respuesta.self
         ).content
-        let orientacion = SugerenciaNotaFrida(
-            categoria: respuesta.categoria, detalle: respuesta.detalle, tono: respuesta.tono,
-            yaPreguntados: yaPreguntados, esRelato: respuesta.intencion == "relato", temaEscucha: respuesta.temaEscucha
-        )
         return InterpretacionFrida(
             intencion: respuesta.intencion, periodo: respuesta.periodo, pendientes: respuesta.pendientes,
-            accion: respuesta.accion, familiar: respuesta.familiar, orientacion: orientacion
+            accion: respuesta.accion, familiar: respuesta.familiar,
+            orientacion: SugerenciaNotaFrida(
+                respuesta.orientacion, detallesCubiertos: cubiertos, esRelato: respuesta.intencion == "relato"
+            )
         )
     }
 

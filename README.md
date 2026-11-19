@@ -31,10 +31,11 @@ disponible.
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
 
-Puedes contarle a Frida algo de tu día por texto o voz. Frida responde con
-preguntas sencillas según el relato. Cuando termines o después de varias
-intervenciones ofrece preparar un resumen para el diario. También puedes
-pedírselo con «Guarda esto en mi diario».
+Puedes contarle a Frida algo de tu día por texto o voz. Foundation Models
+orienta la respuesta con el relato y los detalles que ya mencionaste.
+Prueba «¿Puedes guardarlo en notas?». Si Frida identifica un único diario y
+tienes permiso para escribir, guarda la nota por la API y te confirma en qué
+diario quedó. Si necesita confirmar el destino, te muestra el selector.
 
 En **Revisar resumen**, Apple Intelligence elige fragmentos del relato. Puedes
 compararlos con el texto original, editar la nota, elegir el diario y revisar
