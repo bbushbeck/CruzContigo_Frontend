@@ -63,7 +63,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "CRUZ_API_URL"
-            value = "http://10.22.238.230:3000"
+            value = "http://192.168.68.105:3000"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
