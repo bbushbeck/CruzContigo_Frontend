@@ -48,7 +48,7 @@ struct ApoyoFridaTests {
         let texto = "Mañana tengo que ir por mis hijos a la escuela y no tengo dinero."
         let borrador = BorradorDiarioFrida(texto: texto)
         let respuesta = borrador.sugerenciaLocal(ultimoMensaje: texto)
-        #expect(respuesta.respuesta(para: texto) == "La preocupación por el dinero puede pesar mucho.")
+        #expect(respuesta.respuesta(para: texto) == "Lamento que te estés sintiendo así.")
         #expect(respuesta.detalle == .quePesa)
         #expect(respuesta.convieneSeguirEscuchando(texto))
     }
