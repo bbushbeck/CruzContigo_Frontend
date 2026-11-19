@@ -29,10 +29,15 @@ muestra un botón que abre la pantalla de contactos.
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
 
-Frida también puede escuchar un relato cotidiano. Por ejemplo, escribe o dicta
-«Hoy salí a caminar» en el chat. Puede preguntarte cuánto duró o a dónde fuiste.
-En **Revisar nota**, puedes editar el texto, elegir el diario y revisar quién
-podrá leer la nota. **Guardar en diario** envía la nota a la API con tu sesión.
+Puedes contarle a Frida algo de tu día por texto o voz. Frida responde con
+preguntas sencillas según el relato. Cuando termines o después de varias
+intervenciones ofrece preparar un resumen para el diario. También puedes
+pedírselo con «Guarda esto en mi diario».
+
+En **Revisar resumen** puedes editar el resumen generado por Apple Intelligence
+(o el relato original cuando el modelo no está disponible), elegir el diario
+y revisar quién podrá leerlo. **Guardar en diario** envía la nota a la API con
+tu sesión.
 
 ## Red de cuidado, contactos y diario
 

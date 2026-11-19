@@ -14,6 +14,8 @@ struct FridaView: View {
     @State private var mensajes = [Mensaje("¡Hola! Soy Frida. ¿Cómo estuvo tu día? Puedes contarme algo o preguntarme por medicamentos, recordatorios o contactos de emergencia.")]
     @State private var relato: BorradorDiarioFrida?
     @State private var mostrarNota = false
+    @State private var notaParaRevisar: SolicitudNota?
+    @State private var esperaDecisionDeResumen = false
     @State private var contactosDe: Familiar?
     @State private var porResolver: ConsultaFrida?
     @State private var opciones: [Familiar] = []
@@ -53,10 +55,10 @@ struct FridaView: View {
         .sheet(item: $contactosDe) { persona in
             ContactosEmergenciaView(familiarID: persona.id, nombre: persona.nombre, puedeEditar: false)
         }
-        .sheet(isPresented: $mostrarNota) {
-            if let relato {
+        .sheet(isPresented: $mostrarNota, onDismiss: { notaParaRevisar = nil }) {
+            if let notaParaRevisar {
                 RevisarNotaFridaView(
-                    nota: relato.nota, personas: diariosDisponibles, personaInicial: diarioInicial
+                    nota: notaParaRevisar, personas: diariosDisponibles, personaInicial: diarioInicial
                 ) { persona in
                     self.relato = nil
                     mensajes.append(Mensaje(
@@ -94,7 +96,7 @@ struct FridaView: View {
                     }
                     if consultaActiva != nil {
                         ProgressView("Preparando la consulta…")
-                    } else if relato != nil {
+                    } else if relato?.muestraOferta == true {
                         accionesDelRelato
                     }
                     Color.clear.frame(height: 1).id("fin").accessibilityHidden(true)
@@ -200,6 +202,8 @@ struct FridaView: View {
         borrador = ""
         escribiendo = false
         mensajes.append(Mensaje(texto, delUsuario: true))
+        let respondiaAOferta = esperaDecisionDeResumen
+        esperaDecisionDeResumen = false
 
         if ConsultaFrida.pideConsejoMedico(texto) {
             mensajes.append(Mensaje("Puedo mostrar los medicamentos registrados. Para indicaciones o cambios de dosis, consulta al equipo de salud."))
@@ -210,13 +214,16 @@ struct FridaView: View {
             mensajes.append(Mensaje("Hola. ¿Qué te gustaría contarme hoy?"))
             return
         }
-        if relato != nil, ["revisar nota", "guardar nota", "guardar en diario", "guardar en el diario", "quiero guardar la nota"].contains(palabras) {
+        if relato != nil,
+           BorradorDiarioFrida.pideGuardar(texto)
+            || (respondiaAOferta && ["si", "si por favor", "si gracias", "claro", "adelante"].contains(palabras)) {
             prepararRevisionDeNota()
             return
         }
         let esRelato = BorradorDiarioFrida.esRelatoCotidiano(texto)
-        let nueva = esRelato ? nil : ConsultaFrida(texto, sugerirContactos: ClasificadorContactosFrida.reconoce)
-        if !esRelato, ConsultaFrida.pideCambios(texto), nueva?.abrirPantalla != true {
+        let esConsulta = !esRelato && (relato == nil || BorradorDiarioFrida.esConsultaExplicita(texto))
+        let nueva = esConsulta ? ConsultaFrida(texto, sugerirContactos: ClasificadorContactosFrida.reconoce) : nil
+        if esConsulta, ConsultaFrida.pideCambios(texto), nueva?.abrirPantalla != true {
             mensajes.append(Mensaje("Para hacer cambios, pídeme «Abre medicamentos» o «Abre recordatorios» y usa las opciones de esa pantalla."))
             return
         }
@@ -225,7 +232,6 @@ struct FridaView: View {
             opciones = []
         }
         if let consulta = nueva ?? (esRelato ? nil : porResolver) {
-            relato?.terminarPreguntas()
             ejecutar {
                 if familiares.estado == .inicial || (familiares.familiares.isEmpty && familiares.estado != .listo) {
                     await familiares.cargar()
@@ -238,19 +244,26 @@ struct FridaView: View {
 
         porResolver = nil
         opciones = []
-        if relato?.pregunta != nil {
-            if BorradorDiarioFrida.quiereTerminar(texto) {
-                relato?.terminarPreguntas()
-                mensajes.append(Mensaje("Está bien. Puedes revisar lo que me contaste si quieres guardarlo."))
-            } else if !texto.contains("?") && !texto.contains("¿") {
-                seguirRelato(texto)
-            } else {
-                mensajes.append(Mensaje("Puedes responder la pregunta o tocar «Revisar nota» para guardar lo que ya contaste."))
-            }
-        } else if relato != nil {
-            mensajes.append(Mensaje("Puedes revisar o descartar el borrador antes de empezar otra nota."))
-        } else {
+        guard relato != nil else {
             iniciarRelato(texto, esCotidiano: esRelato)
+            return
+        }
+
+        if BorradorDiarioFrida.quiereCerrar(texto) {
+            if relato?.ofrecerResumen(alCerrar: true) == true {
+                ofrecerResumen()
+            } else {
+                mensajes.append(Mensaje("Gracias por contármelo."))
+            }
+        } else if BorradorDiarioFrida.quiereOmitir(texto) {
+            if respondiaAOferta || ["no lo guardes", "no quiero guardarlo"].contains(palabras) {
+                relato?.descartarOferta()
+            }
+            mensajes.append(Mensaje("Está bien. Si quieres seguir contándome, te leo."))
+        } else if !texto.contains("?") && !texto.contains("¿") {
+            seguirRelato(texto)
+        } else {
+            mensajes.append(Mensaje("Si quieres, cuéntame un poco más de lo que pasó."))
         }
     }
 
@@ -264,7 +277,7 @@ struct FridaView: View {
 
     private var revisarNota: some View {
         Button(action: prepararRevisionDeNota) {
-            Label("Revisar nota", systemImage: "note.text")
+            Label("Revisar resumen", systemImage: "note.text")
                 .frame(minHeight: 44)
         }
         .buttonStyle(.borderedProminent)
@@ -273,6 +286,7 @@ struct FridaView: View {
     private var descartarNota: some View {
         Button("Descartar borrador") {
             relato = nil
+            esperaDecisionDeResumen = false
             mensajes.append(Mensaje("Está bien. Podemos hablar de otra cosa."))
         }
         .frame(minHeight: 44)
@@ -280,9 +294,13 @@ struct FridaView: View {
     }
 
     private func prepararRevisionDeNota() {
+        guard let relato else { return }
         ejecutar {
             if familiares.familiares.isEmpty { await familiares.cargar() }
             try Task.checkCancellation()
+            let resumen = try? await FridaDiario.resumir(relato.nota.texto)
+            try Task.checkCancellation()
+            notaParaRevisar = relato.notaParaRevision(resumen: resumen)
             mostrarNota = true
         }
     }
@@ -307,52 +325,50 @@ struct FridaView: View {
             mensajes.append(Mensaje("Cuéntame una parte a la vez. Una nota del diario admite hasta \(SolicitudNota.largoMaximo) caracteres."))
             return
         }
+        responderAlRelato(BorradorDiarioFrida(texto: texto), ultimoMensaje: texto, esRelatoConocido: esCotidiano)
+    }
+
+    private func seguirRelato(_ texto: String) {
+        guard var borrador = relato, borrador.agregar(texto) else {
+            mensajes.append(Mensaje("Este relato ya es bastante largo. Si quieres, puedo preparar un resumen para el diario."))
+            _ = relato?.ofrecerResumen(alCerrar: true)
+            return
+        }
+        responderAlRelato(borrador, ultimoMensaje: texto, esRelatoConocido: true)
+    }
+
+    private func responderAlRelato(
+        _ borrador: BorradorDiarioFrida, ultimoMensaje: String, esRelatoConocido: Bool
+    ) {
         ejecutar {
-            let sugerencia = try? await FridaDiario.sugerir(para: texto, yaPreguntados: [])
+            let sugerencia = try? await FridaDiario.sugerir(
+                para: borrador.nota.texto, yaPreguntados: borrador.detallesPreguntados
+            )
             try Task.checkCancellation()
-            guard esCotidiano || sugerencia?.esRelato == true else {
+            guard esRelatoConocido || sugerencia?.esRelato == true else {
                 mensajes.append(Mensaje("Puedes contarme algo de tu día, como «Hoy salí a caminar», o pedirme que abra una sección de la app."))
                 return
             }
 
-            var borrador = BorradorDiarioFrida(texto: texto)
-            let orientacion = sugerencia ?? borrador.sugerenciaLocal()
-            borrador.aplicar(orientacion)
-            relato = borrador
-            mensajes.append(Mensaje("Gracias por contármelo. Si quieres, puedes guardarlo como nota del diario."))
-            anunciarPregunta()
-        }
-    }
-
-    private func seguirRelato(_ texto: String) {
-        guard var borrador = relato, borrador.responder(texto) else {
-            mensajes.append(Mensaje("Tu respuesta es demasiado larga para la nota. Puedes acortarla o revisar lo que ya contaste."))
-            return
-        }
-        relato = borrador
-        guard borrador.conversacion.puedeContinuar else {
-            mensajes.append(Mensaje("Ya reuní lo que me contaste. ¿Quieres revisar la nota?"))
-            return
-        }
-
-        ejecutar {
-            let sugerencia = try? await FridaDiario.sugerir(
-                para: borrador.nota.texto, yaPreguntados: borrador.conversacion.detallesPreguntados
-            )
-            try Task.checkCancellation()
-            let orientacion = sugerencia ?? borrador.sugerenciaLocal()
-            borrador.aplicar(orientacion)
-            relato = borrador
-            if borrador.pregunta == nil {
-                mensajes.append(Mensaje("Ya reuní lo que me contaste. ¿Quieres revisar la nota?"))
-            } else {
-                anunciarPregunta()
+            var actualizado = borrador
+            let orientacion = sugerencia.flatMap { $0.esRelato ? $0 : nil }
+                ?? borrador.sugerenciaLocal(ultimoMensaje: ultimoMensaje)
+            if actualizado.ofrecerResumen() {
+                relato = actualizado
+                ofrecerResumen()
+                return
             }
+
+            let pregunta = actualizado.elegirPregunta(orientacion)?.pregunta
+            relato = actualizado
+            let respuesta = [orientacion.tono.respuesta, pregunta].compactMap { $0 }.joined(separator: " ")
+            mensajes.append(Mensaje(respuesta))
         }
     }
 
-    private func anunciarPregunta() {
-        if let pregunta = relato?.pregunta { mensajes.append(Mensaje(pregunta.pregunta)) }
+    private func ofrecerResumen() {
+        esperaDecisionDeResumen = true
+        mensajes.append(Mensaje("¿Quieres que prepare un resumen de lo que me contaste para tu diario?"))
     }
 
     private func resolver(_ consulta: ConsultaFrida, texto: String, esSeguimiento: Bool) async {
