@@ -47,6 +47,24 @@ expresiones explícitas de peligro abren opciones de apoyo para México sin
 iniciar llamadas. Para riesgo de hacerse daño, la app muestra 911, Línea
 de la Vida y los contactos de emergencia disponibles en la cuenta.
 
+### Siri y Atajos
+
+Con Siri en español, di:
+
+- «Oye Siri, platicar con Frida en CruzContigo». Abre el chat.
+- «Oye Siri, pregúntale a Frida en CruzContigo». Siri pide la pregunta y Frida la responde en el chat.
+- «Oye Siri, pregúntale a Frida qué recordatorios tengo hoy en CruzContigo». Siri lee el resumen después de autenticarte en el dispositivo. La app necesita una sesión activa.
+
+Estas acciones también aparecen en **Atajos → CruzContigo**. Para invocarlas
+con un nombre propio, crea un atajo con la acción de CruzContigo y dile a Siri
+el nombre que le pusiste.
+
+Para probar la consulta de recordatorios cuando Siri ejecuta la app por su
+cuenta, agrega un ajuste de compilación definido por el usuario llamado
+`CRUZ_API_URL` en el target **CruzContigo → Build Settings** con la URL del
+backend accesible desde el iPhone. Si también está en las variables de
+entorno del esquema **Run**, usa la misma URL o desactiva esa variable.
+
 ## Red de cuidado, contactos y diario
 
 - **Red de cuidado (HU-17, HU-26):** invita por teléfono o con un código de un solo uso (`cruzcontigo://invitacion/CODIGO`, registrado en `CruzContigo-Info.plist`) con rol administrador, cocuidador, solo lectura o temporal. El acceso temporal vence solo y no ve la ficha médica salvo que se permita.

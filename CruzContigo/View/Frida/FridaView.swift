@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FridaView: View {
     let familiarSeleccionado: UUID?
+    @Binding var solicitud: SolicitudDeFrida?
     let abrir: (Ruta) -> Void
 
     @Environment(FamiliaresStore.self) private var familiares
@@ -71,6 +72,11 @@ struct FridaView: View {
         }
         .onChange(of: dictado.transcripcion) { _, texto in
             if !texto.isEmpty { borrador = texto }
+        }
+        .onChange(of: solicitudLista, initial: true) { _, lista in
+            guard let pregunta = lista?.pregunta else { return }
+            solicitud = nil
+            enviarMensaje(pregunta)
         }
         .onChange(of: scenePhase) { _, fase in
             if fase == .background { dictado.cancelar() }
@@ -250,13 +256,21 @@ struct FridaView: View {
         borrador.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var solicitudLista: SolicitudDeFrida? {
+        guard consultaActiva == nil, dictado.estado == .listo, !mostrarNota, contactosDe == nil else { return nil }
+        return solicitud
+    }
+
     private func enviar() {
         let texto = textoLimpio
-        guard !texto.isEmpty else { return }
-        let apoyoDetectado = ApoyoFrida.detectar(en: texto)
-        guard consultaActiva == nil || apoyoDetectado != nil else { return }
+        guard !texto.isEmpty, consultaActiva == nil || ApoyoFrida.detectar(en: texto) != nil else { return }
         borrador = ""
         escribiendo = false
+        enviarMensaje(texto)
+    }
+
+    private func enviarMensaje(_ texto: String) {
+        let apoyoDetectado = ApoyoFrida.detectar(en: texto)
         mensajes.append(Mensaje(texto, delUsuario: true))
         let respondiaAOferta = esperaDecisionDeResumen
         esperaDecisionDeResumen = false
@@ -662,16 +676,9 @@ struct FridaView: View {
 
     private func resumenRecordatorios(_ consulta: ConsultaFrida, persona: Familiar?) async throws -> String {
         let recordatorios = try await RecordatoriosService().listar()
-        let dia = diaConsultado(consulta.periodo)
-        let ahora = Date.now
-        let visibles = recordatorios.filter { recordatorio in
-            if let persona, recordatorio.familiarID != persona.id { return false }
-            if (consulta.pendientes || consulta.periodo == .proximos) && recordatorio.completado { return false }
-            if let dia {
-                return Calendar.current.isDate(recordatorio.fecha, inSameDayAs: dia)
-            }
-            return consulta.periodo != .proximos || recordatorio.fecha >= ahora
-        }
+        let visibles = ResumenRecordatoriosFrida.filtrar(
+            recordatorios, periodo: consulta.periodo, pendientes: consulta.pendientes, familiarID: persona?.id
+        )
         let nombre = persona.map { " de \($0.nombreCompleto)" } ?? ""
         guard !visibles.isEmpty else { return "No encontré recordatorios\(nombre) para esa consulta." }
         let nombres = Dictionary(uniqueKeysWithValues: familiares.familiares.map { ($0.id, $0.nombreCompleto) })

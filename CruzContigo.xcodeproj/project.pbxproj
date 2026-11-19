@@ -128,9 +128,10 @@
 				};
 			};
 			buildConfigurationList = 4C2BC5853088623500654017 /* Build configuration list for PBXProject "CruzContigo" */;
-			developmentRegion = en;
+			developmentRegion = es;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				es,
 				en,
 				Base,
 			);

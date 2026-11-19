@@ -10,6 +10,11 @@ enum AppConfig {
         if let valor = ProcessInfo.processInfo.environment["CRUZ_API_URL"] {
             return valor.isEmpty ? nil : URL(string: valor)
         }
+        if let valor = Bundle.main.object(forInfoDictionaryKey: "CRUZ_API_URL") as? String,
+           let url = URL(string: valor), let scheme = url.scheme?.lowercased(),
+           ["https", "http"].contains(scheme), url.host?.isEmpty == false {
+            return url
+        }
         #if DEBUG
         return URL(string: "http://localhost:3000")
         #else
