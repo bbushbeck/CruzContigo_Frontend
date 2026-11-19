@@ -3,7 +3,7 @@ import Foundation
 struct InterpretacionFrida {
     enum Intencion: String {
         case medicamentos, recordatorios, contactosEmergencia
-        case relato, guardarDiario, prepararDiario, consejoMedico, otro
+        case relato, guardarDiario, prepararDiario, consejoMedico, orientacionCuidado, otro
     }
 
     let intencion: Intencion
@@ -52,6 +52,13 @@ struct InterpretacionFrida {
     static func resolverConsulta(
         _ modelo: InterpretacionFrida?, texto: String, contandoRelato: Bool
     ) -> ConsultaFrida? {
+        if let contactos = ConsultaFrida.contactosSolicitados(texto) {
+            if modelo?.intencion == .contactosEmergencia,
+               let propuesta = modelo?.consulta(para: texto, contandoRelato: contandoRelato) {
+                return propuesta
+            }
+            return contactos
+        }
         guard !BorradorDiarioFrida.esRelatoCotidiano(texto),
               !contandoRelato || BorradorDiarioFrida.esConsultaExplicita(texto),
               modelo?.intencion != .consejoMedico,
@@ -62,6 +69,14 @@ struct InterpretacionFrida {
         }
         guard modelo?.intencion != .relato else { return nil }
         return ConsultaFrida(texto)
+    }
+
+    static func pideOrientacionDeCuidado(_ modelo: InterpretacionFrida?, texto: String) -> Bool {
+        if ConsultaFrida.pideOrientacionDeCuidado(texto) { return true }
+        guard modelo?.intencion == .orientacionCuidado, BorradorDiarioFrida.esConsultaExplicita(texto),
+              !BorradorDiarioFrida.esRelatoCotidiano(texto) else { return false }
+        let temas: Set<String> = ["ayuda", "ayudar", "ayudarle", "apoyo", "apoyar", "apoyarle", "cuidar", "cuidado"]
+        return !temas.isDisjoint(with: ConsultaFrida.palabras(texto))
     }
 
     func autorizaRevision(_ texto: String) -> Bool {

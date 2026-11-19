@@ -41,6 +41,17 @@ struct ConsultaFridaTests {
         #expect(ConsultaFrida("No quiero llamar a nadie") == nil)
     }
 
+    @Test func resuelveLosContactosDeLaPersonaMencionada() {
+        let mafer = Familiar(nombre: "Mafer", apellidos: "López", fechaNacimiento: .now,
+                             parentesco: .hermana, tipoCuidado: .otro)
+        let ana = Familiar(nombre: "Ana", apellidos: "López", fechaNacimiento: .now,
+                           parentesco: .madre, tipoCuidado: .otro)
+        let frase = "Dame los contactos de emergencia de Mafer"
+        let consulta = ConsultaFrida.contactosSolicitados(frase)
+        #expect(consulta?.mencionaPersona == true)
+        #expect(ConsultaFrida.coincidencias(frase, familiares: [ana, mafer]) == [mafer])
+    }
+
     @Test func seleccionaPorNombreCompletoOParentesco() {
         let madre = Familiar(nombre: "María", apellidos: "López", fechaNacimiento: .now,
                              parentesco: .madre, tipoCuidado: .otro)

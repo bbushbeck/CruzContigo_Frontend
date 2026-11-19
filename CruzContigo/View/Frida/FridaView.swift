@@ -290,8 +290,15 @@ struct FridaView: View {
             if ["estoy a salvo", "ya estoy a salvo", "ya me estan atendiendo", "ya me estan ayudando"].contains(palabras) {
                 self.apoyoActivo = nil
                 mensajes.append(Mensaje("Gracias por contármelo. Si quieres seguir hablando, te leo."))
-            } else if IntencionEscuchaFrida.solicitaContacto(texto) {
-                mostrarContactosDeApoyo()
+            } else if let consulta = ConsultaFrida.contactosSolicitados(texto) {
+                if consulta.mencionaPersona {
+                    ejecutar {
+                        try await cargarFamiliaresSiHaceFalta()
+                        await resolver(consulta, texto: texto, esSeguimiento: false)
+                    }
+                } else {
+                    mostrarContactosDeApoyo()
+                }
             } else {
                 mensajes.append(Mensaje(
                     "Te leo. Si puedes, busca a alguien de confianza que pueda estar contigo.",
@@ -367,6 +374,21 @@ struct FridaView: View {
                 registrarRelato(texto, orientacion: interpretacion?.orientacion)
                 return
             }
+            let nueva = InterpretacionFrida.resolverConsulta(
+                interpretacion, texto: texto, contandoRelato: relatoPrevio != nil
+            )
+            if let nueva, nueva.tema == .contactosEmergencia {
+                relato?.descartarOferta()
+                porResolver = nil
+                opciones = []
+                try await cargarFamiliaresSiHaceFalta()
+                await resolver(nueva, texto: texto, esSeguimiento: false)
+                return
+            }
+            if InterpretacionFrida.pideOrientacionDeCuidado(interpretacion, texto: texto) {
+                try await responderOrientacionDeCuidado(texto)
+                return
+            }
             let esRelatoCotidiano = BorradorDiarioFrida.esRelatoCotidiano(texto)
             if interpretacion?.intencion == .consejoMedico, !esRelatoCotidiano {
                 responderConsejoMedico()
@@ -381,9 +403,6 @@ struct FridaView: View {
                 return
             }
 
-            let nueva = InterpretacionFrida.resolverConsulta(
-                interpretacion, texto: texto, contandoRelato: relatoPrevio != nil
-            )
             let esRelato = esRelatoCotidiano || interpretacion?.intencion == .relato
             if !esRelato, ConsultaFrida.pideCambios(texto), nueva?.abrirPantalla != true {
                 mensajes.append(Mensaje("Puedes hacer cambios desde las pantallas de medicamentos y recordatorios."))
@@ -397,10 +416,7 @@ struct FridaView: View {
                 && !ConsultaFrida.coincidencias(texto, familiares: opciones).isEmpty
             let consultaPendiente = !esRelato || esNombreDeSeguimiento ? porResolver : nil
             if let consulta = nueva ?? consultaPendiente {
-                if familiares.estado == .inicial || (familiares.familiares.isEmpty && familiares.estado != .listo) {
-                    await familiares.cargar()
-                }
-                try Task.checkCancellation()
+                try await cargarFamiliaresSiHaceFalta()
                 await resolver(consulta, texto: texto, esSeguimiento: nueva == nil)
                 return
             }
@@ -413,6 +429,30 @@ struct FridaView: View {
                 mensajes.append(Mensaje("Puedes contarme algo de tu día o pedirme medicamentos, recordatorios o contactos de emergencia."))
             }
         }
+    }
+
+    private func cargarFamiliaresSiHaceFalta() async throws {
+        if familiares.estado == .inicial || (familiares.familiares.isEmpty && familiares.estado != .listo) {
+            await familiares.cargar()
+        }
+        try Task.checkCancellation()
+    }
+
+    private func responderOrientacionDeCuidado(_ texto: String) async throws {
+        relato?.descartarOferta()
+        porResolver = nil
+        opciones = []
+        try await cargarFamiliaresSiHaceFalta()
+        let coincidencias = ConsultaFrida.coincidencias(texto, familiares: familiares.familiares)
+        let persona = coincidencias.count == 1 ? coincidencias.first : nil
+        let aQuien = persona.map { " a ($0.nombre)" } ?? ""
+        let destino = persona.flatMap { persona in
+            familiaresParaApoyo.contains { $0.id == persona.id } ? Destino.contactos(persona) : nil
+        }
+        mensajes.append(Mensaje(
+            "¿Qué necesitas para ayudar(aQuien)? Puedo orientarte hacia los contactos de emergencia, los recordatorios o los medicamentos registrados.",
+            destino: destino
+        ))
     }
 
     private func responderConsejoMedico() {

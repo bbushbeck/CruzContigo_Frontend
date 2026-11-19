@@ -3,7 +3,7 @@ import FoundationModels
 enum FridaDiario {
     @Generable
     fileprivate struct Respuesta {
-        @Guide(description: "Intención del último mensaje: medicamentos, recordatorios, contactosEmergencia, relato, guardarDiario, prepararDiario, consejoMedico u otro.")
+        @Guide(description: "Intención del último mensaje: medicamentos, recordatorios, contactosEmergencia, orientacionCuidado, relato, guardarDiario, prepararDiario, consejoMedico u otro.")
         var intencion: String
 
         @Guide(description: "Periodo de una consulta: todos, hoy, manana o proximos.")
@@ -43,6 +43,9 @@ enum FridaDiario {
             Usa abrir solo cuando pide ir a una pantalla; en otras consultas usa consultar.
             Para contactos debe pedir a quién llamar o pedir ver contactos. Un desahogo no es una petición
             de contactos. Usa consejoMedico si pide diagnóstico, tratamiento, dosis o consejo de salud.
+            Una petición directa o una frase como «contactos de emergencia de mi mamá» es una consulta,
+            aunque se dicte sin signos y después de un relato. Usa orientacionCuidado si pregunta
+            en general cómo ayudar a alguien.
             Usa guardarDiario si pide guardar o anotar el relato, incluso al final de un mensaje dictado.
             Usa prepararDiario si pide revisar, leer o resumir su relato antes de guardarlo.
             Usa relato para vivencias, observaciones o cómo se siente la persona. Saludos y otras peticiones
@@ -55,6 +58,9 @@ enum FridaDiario {
             «¿Qué está tomando mi mamá?» → medicamentos, todos, consultar, mi mamá.
             «Llévame a ver lo que tengo agendado mañana» → recordatorios, manana, abrir.
             «¿A quién le aviso si le pasa algo a mi abuela?» → contactosEmergencia, consultar, mi abuela.
+            «Dame los contactos de emergencia de Ana» → contactosEmergencia, consultar, Ana.
+            «Contactos de emergencia de Ana» → contactosEmergencia, consultar, Ana.
+            «Cómo puedo ayudar a Ana» → orientacionCuidado.
             «Tengo deudas por los medicamentos de mi mamá y estoy triste» → relato, dinero, dificil.
             «Mi hermana últimamente come poco» → relato, alimentacion, desdeCuando.
             «No ha comido bien en la última semana, ¿puedes guardarlo en notas?» → guardarDiario.

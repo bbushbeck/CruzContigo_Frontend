@@ -20,7 +20,7 @@ struct ConsultaFrida: Equatable {
 
     init?(_ texto: String) {
         let palabras = Self.palabras(texto)
-        let esContacto = IntencionEscuchaFrida.solicitaContacto(texto)
+        let esContacto = Self.autorizaContactos(texto)
         let medicamentos: Set<String> = ["medicamentos", "medicamento", "medicinas", "medicina",
                                          "tratamientos", "tratamiento", "pastillas", "pastilla"]
         let recordatorios: Set<String> = ["recordatorios", "recordatorio", "avisos", "aviso", "alertas", "alerta", "citas", "cita"]
@@ -64,7 +64,15 @@ struct ConsultaFrida: Equatable {
     // El modelo propone una ruta. La app verifica que el mensaje realmente la solicite.
     static func autorizaContactos(_ texto: String) -> Bool {
         let palabras = palabras(texto)
-        return IntencionEscuchaFrida.solicitaContacto(texto) && !rechazaContactos(palabras)
+        return IntencionEscuchaFrida.solicitaContacto(texto) && !rechazaContactos(palabras) && !pideCambios(texto)
+    }
+
+    static func contactosSolicitados(_ texto: String) -> ConsultaFrida? {
+        guard autorizaContactos(texto) else { return nil }
+        return ConsultaFrida(
+            tema: .contactosEmergencia, periodo: .todos, pendientes: false,
+            abrirPantalla: false, mencionaPersona: mencionaFamiliar(texto)
+        )
     }
 
     var requiereFamiliar: Bool { tema != .recordatorios }
@@ -78,6 +86,10 @@ struct ConsultaFrida: Equatable {
         texto.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es_MX"))
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
             .map(String.init)
+    }
+
+    static func comienzoDePeticion(_ texto: String) -> ArraySlice<String> {
+        palabras(texto).drop(while: { ["frida", "oye", "hola", "ay", "bueno", "ok", "por", "favor"].contains($0) })
     }
 
     static func contiene(_ frase: String, en palabras: [String]) -> Bool {
@@ -123,6 +135,15 @@ struct ConsultaFrida: Equatable {
         let palabras = palabras(texto)
         return ["le doy", "debo darle", "deberia tomar", "me recomiendas", "le puedo dar",
                 "cuanta dosis", "que dosis debo", "puede tomar"].contains { contiene($0, en: palabras) }
+    }
+
+    static func pideOrientacionDeCuidado(_ texto: String) -> Bool {
+        let comienzo = comienzoDePeticion(texto)
+        let preguntas = ["como puedo ayudar", "como le puedo ayudar", "como puedo ayudarle", "como puedo apoyarla",
+                         "como puedo apoyarlo", "como puedo apoyar", "como le puedo apoyar", "como la puedo ayudar",
+                         "como lo puedo ayudar", "como ayudo", "como le ayudo", "como la ayudo", "como lo ayudo",
+                         "que puedo hacer para ayudar", "que puedo hacer para apoyar"]
+        return preguntas.contains { comienzo.starts(with: palabras($0)) }
     }
 
     private static func alias(de parentesco: Parentesco) -> [String] {

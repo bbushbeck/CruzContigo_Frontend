@@ -100,19 +100,36 @@ enum IntencionEscuchaFrida {
 
     static func solicitaContacto(_ texto: String) -> Bool {
         guard !rechazaContactos(texto), !pideEscucha(texto) else { return false }
-        let palabras = ConsultaFrida.palabras(texto)
-        let pideContacto = ["contactos de emergencia", "contacto de emergencia",
-                            "telefono de emergencia", "numero de emergencia"].contains {
-            ConsultaFrida.contiene($0, en: palabras)
-        }
-        if pideContacto { return true }
+        let comienzo = ConsultaFrida.comienzoDePeticion(texto)
+        let palabras = Array(comienzo)
+        let acciones: Set<String> = ["llamar", "llamarle", "llamo", "avisar", "avisarle", "aviso", "contactar",
+                                     "contacto", "comunicarme", "comunico", "telefono", "numero"]
+        let peticiones = [
+            "dame", "dime", "pasame", "muestra", "muestrame", "ensename", "abre", "abreme", "busca", "ver",
+            "quiero ver", "quiero los contactos", "necesito ver", "necesito contactos", "necesito los", "necesito el",
+            "puedes", "podrias", "me puedes", "me podrias", "me pasas", "me das",
+            "cuales", "cual", "donde", "a quien", "con quien", "no se a quien", "ayudame a encontrar"
+        ]
+        let pide = peticiones.contains { comienzo.starts(with: ConsultaFrida.palabras($0)) }
+        let nombres = ["contactos de emergencia", "contacto de emergencia", "telefono de emergencia",
+                       "telefonos de emergencia", "numero de emergencia", "numeros de emergencia"]
 
+        if let nombre = nombres.first(where: { ConsultaFrida.contiene($0, en: palabras) }) {
+            if pide { return !ConsultaFrida.contiene("ejemplo de", en: palabras) }
+            let asunto = comienzo.drop(while: { ["los", "el", "las", "la", "mis", "sus"].contains($0) })
+            let terminos = ConsultaFrida.palabras(nombre)
+            guard asunto.starts(with: terminos) else { return false }
+            let complemento = asunto.dropFirst(terminos.count)
+            return complemento.isEmpty || complemento.starts(with: ["por", "favor"])
+                || (["de", "para"].contains(complemento.first ?? "") && complemento.count > 1
+                    && !complemento.contains("no") && !complemento.contains("ya"))
+        }
+
+        let esTelefono = ["numero de", "telefono de"].contains { comienzo.starts(with: ConsultaFrida.palabras($0)) }
         let buscaPersona = ["a quien", "con quien", "llamar a alguien", "avisarle a alguien",
                             "contactar a alguien", "numero de", "telefono de"].contains {
             ConsultaFrida.contiene($0, en: palabras)
         }
-        let acciones: Set<String> = ["llamar", "llamarle", "llamo", "avisar", "avisarle", "aviso", "contactar",
-                                    "contacto", "comunicarme", "comunico", "telefono", "numero"]
-        return buscaPersona && !acciones.isDisjoint(with: palabras)
+        return (pide || esTelefono) && buscaPersona && !acciones.isDisjoint(with: palabras)
     }
 }
