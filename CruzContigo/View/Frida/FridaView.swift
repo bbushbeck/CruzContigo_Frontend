@@ -10,18 +10,24 @@ struct FridaView: View {
     @FocusState private var escribiendo: Bool
     @State private var dictado = DictadoFrida()
     @State private var borrador = ""
-    @State private var mensajes = [Mensaje("¡Hola! Soy Frida. Prueba «¿Qué medicamentos toma mi mamá?» o «¿Qué recordatorios tengo hoy?».")]
+    @State private var mensajes = [Mensaje("¡Hola! Soy Frida. Puedes preguntarme por medicamentos, recordatorios o contactos de emergencia.")]
+    @State private var contactosDe: Familiar?
     @State private var porResolver: ConsultaFrida?
     @State private var opciones: [Familiar] = []
     @State private var consultaActiva: Task<Void, Never>?
+
+    private enum Destino {
+        case pantalla(Ruta)
+        case contactos(Familiar)
+    }
 
     private struct Mensaje: Identifiable {
         let id = UUID()
         let texto: String
         var delUsuario = false
-        var destino: Ruta?
+        var destino: Destino?
 
-        init(_ texto: String, delUsuario: Bool = false, destino: Ruta? = nil) {
+        init(_ texto: String, delUsuario: Bool = false, destino: Destino? = nil) {
             self.texto = texto
             self.delUsuario = delUsuario
             self.destino = destino
@@ -41,6 +47,9 @@ struct FridaView: View {
                 }
         }
         .tint(.brandRed)
+        .sheet(item: $contactosDe) { persona in
+            ContactosEmergenciaView(familiarID: persona.id, nombre: persona.nombre, puedeEditar: false)
+        }
         .onChange(of: dictado.transcripcion) { _, texto in
             if !texto.isEmpty { borrador = texto }
         }
@@ -68,7 +77,7 @@ struct FridaView: View {
                         .frame(minHeight: 44)
                     }
                     if consultaActiva != nil {
-                        ProgressView("Consultando la API…")
+                        ProgressView("Preparando la consulta…")
                     }
                     Color.clear.frame(height: 1).id("fin").accessibilityHidden(true)
                 }
@@ -101,7 +110,7 @@ struct FridaView: View {
 
             if let destino = mensaje.destino {
                 Button {
-                    abrir(destino)
+                    abrirDestino(destino)
                 } label: {
                     Label(titulo(de: destino), systemImage: "arrow.right")
                         .frame(minHeight: 44)
@@ -178,7 +187,7 @@ struct FridaView: View {
             mensajes.append(Mensaje("Puedo mostrar los medicamentos registrados. Para indicaciones o cambios de dosis, consulta al equipo de salud."))
             return
         }
-        let nueva = ConsultaFrida(texto)
+        let nueva = ConsultaFrida(texto, sugerirContactos: ClasificadorContactosFrida.reconoce)
         if ConsultaFrida.pideCambios(texto), nueva?.abrirPantalla != true {
             mensajes.append(Mensaje("Para hacer cambios, pídeme «Abre medicamentos» o «Abre recordatorios» y usa las opciones de esa pantalla."))
             return
@@ -188,7 +197,7 @@ struct FridaView: View {
             opciones = []
         }
         guard let consulta = nueva ?? porResolver else {
-            mensajes.append(Mensaje("Puedo ayudarte con medicamentos o recordatorios. Prueba «Muéstrame los recordatorios de mañana»."))
+            mensajes.append(Mensaje("Puedo ayudarte con medicamentos, recordatorios o contactos de emergencia. Prueba «Ver contactos de emergencia»."))
             return
         }
         ejecutar {
@@ -209,18 +218,18 @@ struct FridaView: View {
             await consultar(consulta, persona: persona)
         } else if coincidencias.count > 1 {
             pedirFamiliar(consulta, opciones: coincidencias, mensaje: "¿A cuál de estas personas te refieres?")
-        } else if mencionaPersona || consulta.tema == .medicamentos {
+        } else if mencionaPersona || consulta.requiereFamiliar {
             if !mencionaPersona, let persona = personas.first(where: { $0.id == familiarSeleccionado })
                 ?? (personas.count == 1 ? personas.first : nil) {
                 await consultar(consulta, persona: persona)
             } else if case .error(let error) = familiares.estado, personas.isEmpty {
                 mensajes.append(Mensaje("No pude cargar a tus familiares. \(error)"))
             } else if personas.isEmpty {
-                mensajes.append(Mensaje("Agrega a la persona que cuidas para consultar sus datos.", destino: .agregarFamiliar))
+                mensajes.append(Mensaje("Agrega a la persona que cuidas para consultar sus datos.", destino: .pantalla(.agregarFamiliar)))
             } else {
                 pedirFamiliar(consulta, opciones: personas, mensaje: mencionaPersona
                     ? "No encontré ese nombre. ¿De quién quieres ver la información?"
-                    : "¿De quién quieres ver los medicamentos?")
+                    : "¿De quién quieres ver la información?")
             }
         } else {
             await consultar(consulta, persona: nil)
@@ -254,26 +263,40 @@ struct FridaView: View {
     private func consultar(_ consulta: ConsultaFrida, persona: Familiar?) async {
         porResolver = nil
         opciones = []
-        let modulo: Modulo = consulta.tema == .medicamentos ? .medicamentos : .recordatorios
-        let destino = Ruta.modulo(modulo, familiarID: persona?.id)
+        let destino: Ruta
+        let cargarResumen: () async throws -> String
+        switch consulta.tema {
+        case .contactosEmergencia:
+            guard let persona else { return }
+            if persona.esProfesional {
+                mensajes.append(Mensaje("Tu tipo de acceso permite consultar la ficha médica de esta persona."))
+            } else {
+                mensajes.append(Mensaje(
+                    "Aquí puedes ver los contactos de emergencia de \(persona.nombreCompleto).",
+                    destino: .contactos(persona)
+                ))
+            }
+            return
+        case .medicamentos:
+            guard let persona else { return }
+            destino = .modulo(.medicamentos, familiarID: persona.id)
+            cargarResumen = { try await resumenMedicamentos(consulta, persona: persona) }
+        case .recordatorios:
+            destino = .modulo(.recordatorios, familiarID: persona?.id)
+            cargarResumen = { try await resumenRecordatorios(consulta, persona: persona) }
+        }
+
         if consulta.abrirPantalla {
             abrir(destino)
             return
         }
         do {
-            let resultado: String
-            switch consulta.tema {
-            case .medicamentos:
-                guard let persona else { return }
-                resultado = try await resumenMedicamentos(consulta, persona: persona)
-            case .recordatorios:
-                resultado = try await resumenRecordatorios(consulta, persona: persona)
-            }
+            let resultado = try await cargarResumen()
             try Task.checkCancellation()
-            mensajes.append(Mensaje(resultado, destino: destino))
+            mensajes.append(Mensaje(resultado, destino: .pantalla(destino)))
         } catch {
             guard !Task.isCancelled else { return }
-            mensajes.append(Mensaje("No pude cargar la consulta. \(error.localizedDescription)", destino: destino))
+            mensajes.append(Mensaje("No pude cargar la consulta. \(error.localizedDescription)", destino: .pantalla(destino)))
         }
     }
 
@@ -329,10 +352,18 @@ struct FridaView: View {
         return "\(encabezado)\n\(extracto)\(restantes)"
     }
 
-    private func titulo(de destino: Ruta) -> String {
+    private func abrirDestino(_ destino: Destino) {
         switch destino {
-        case .agregarFamiliar: "Agregar persona"
-        case .modulo(.medicamentos, _): "Abrir Medicamentos"
+        case .pantalla(let ruta): abrir(ruta)
+        case .contactos(let persona): contactosDe = persona
+        }
+    }
+
+    private func titulo(de destino: Destino) -> String {
+        switch destino {
+        case .contactos: "Ver contactos de emergencia"
+        case .pantalla(.agregarFamiliar): "Agregar persona"
+        case .pantalla(.modulo(.medicamentos, _)): "Abrir Medicamentos"
         default: "Abrir Recordatorios"
         }
     }

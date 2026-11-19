@@ -20,6 +20,12 @@ Desde **Inicio**, abre **Habla con Frida**. Puedes escribir una consulta o dicta
 - «¿Qué medicamentos toma mi mamá hoy?»
 - «¿Qué recordatorios tengo mañana?»
 - «Llévame a Recordatorios»
+- «¿A quién puedo avisarle si le pasa algo a mi mamá?»
+
+Para los contactos de emergencia, Frida usa el modelo de similitud semántica
+en español de `NaturalLanguage` en el dispositivo. También puedes pedir
+«Ver contactos de emergencia» directamente. Frida resuelve el familiar y
+muestra un botón que abre la pantalla de contactos.
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
 
