@@ -7,10 +7,13 @@ struct FridaView: View {
     @Environment(FamiliaresStore.self) private var familiares
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("rolUsuario") private var rolUsuario = UserRole.cuidador.rawValue
     @FocusState private var escribiendo: Bool
     @State private var dictado = DictadoFrida()
     @State private var borrador = ""
-    @State private var mensajes = [Mensaje("¡Hola! Soy Frida. Puedes preguntarme por medicamentos, recordatorios o contactos de emergencia.")]
+    @State private var mensajes = [Mensaje("¡Hola! Soy Frida. ¿Cómo estuvo tu día? Puedes contarme algo o preguntarme por medicamentos, recordatorios o contactos de emergencia.")]
+    @State private var relato: BorradorDiarioFrida?
+    @State private var mostrarNota = false
     @State private var contactosDe: Familiar?
     @State private var porResolver: ConsultaFrida?
     @State private var opciones: [Familiar] = []
@@ -50,6 +53,19 @@ struct FridaView: View {
         .sheet(item: $contactosDe) { persona in
             ContactosEmergenciaView(familiarID: persona.id, nombre: persona.nombre, puedeEditar: false)
         }
+        .sheet(isPresented: $mostrarNota) {
+            if let relato {
+                RevisarNotaFridaView(
+                    nota: relato.nota, personas: diariosDisponibles, personaInicial: diarioInicial
+                ) { persona in
+                    self.relato = nil
+                    mensajes.append(Mensaje(
+                        "Guardé la nota en el diario de \(persona.nombreCompleto).",
+                        destino: .pantalla(.modulo(.diario, familiarID: persona.id))
+                    ))
+                }
+            }
+        }
         .onChange(of: dictado.transcripcion) { _, texto in
             if !texto.isEmpty { borrador = texto }
         }
@@ -78,6 +94,8 @@ struct FridaView: View {
                     }
                     if consultaActiva != nil {
                         ProgressView("Preparando la consulta…")
+                    } else if relato != nil {
+                        accionesDelRelato
                     }
                     Color.clear.frame(height: 1).id("fin").accessibilityHidden(true)
                 }
@@ -150,7 +168,7 @@ struct FridaView: View {
                 .accessibilityLabel(dictado.estado == .escuchando ? "Terminar dictado" : "Dictar consulta")
                 .disabled(consultaActiva != nil || dictado.estado == .permisos || dictado.estado == .terminando)
 
-                TextField("Escribe o dicta tu consulta", text: $borrador, axis: .vertical)
+                TextField("Escribe o dicta un mensaje", text: $borrador, axis: .vertical)
                     .font(.app(.body))
                     .lineLimit(1...4)
                     .focused($escribiendo)
@@ -163,7 +181,7 @@ struct FridaView: View {
                         .font(.title2)
                         .frame(width: 44, height: 44)
                 }
-                .accessibilityLabel("Enviar consulta")
+                .accessibilityLabel("Enviar mensaje")
                 .disabled(textoLimpio.isEmpty || consultaActiva != nil || dictado.estado != .listo)
             }
         }
@@ -187,8 +205,18 @@ struct FridaView: View {
             mensajes.append(Mensaje("Puedo mostrar los medicamentos registrados. Para indicaciones o cambios de dosis, consulta al equipo de salud."))
             return
         }
-        let nueva = ConsultaFrida(texto, sugerirContactos: ClasificadorContactosFrida.reconoce)
-        if ConsultaFrida.pideCambios(texto), nueva?.abrirPantalla != true {
+        let palabras = ConsultaFrida.palabras(texto).joined(separator: " ")
+        if ["hola", "buenos dias", "buenas tardes", "buenas noches"].contains(palabras) {
+            mensajes.append(Mensaje("Hola. ¿Qué te gustaría contarme hoy?"))
+            return
+        }
+        if relato != nil, ["revisar nota", "guardar nota", "guardar en diario", "guardar en el diario", "quiero guardar la nota"].contains(palabras) {
+            prepararRevisionDeNota()
+            return
+        }
+        let esRelato = BorradorDiarioFrida.esRelatoCotidiano(texto)
+        let nueva = esRelato ? nil : ConsultaFrida(texto, sugerirContactos: ClasificadorContactosFrida.reconoce)
+        if !esRelato, ConsultaFrida.pideCambios(texto), nueva?.abrirPantalla != true {
             mensajes.append(Mensaje("Para hacer cambios, pídeme «Abre medicamentos» o «Abre recordatorios» y usa las opciones de esa pantalla."))
             return
         }
@@ -196,17 +224,135 @@ struct FridaView: View {
             porResolver = nil
             opciones = []
         }
-        guard let consulta = nueva ?? porResolver else {
-            mensajes.append(Mensaje("Puedo ayudarte con medicamentos, recordatorios o contactos de emergencia. Prueba «Ver contactos de emergencia»."))
+        if let consulta = nueva ?? (esRelato ? nil : porResolver) {
+            relato?.terminarPreguntas()
+            ejecutar {
+                if familiares.estado == .inicial || (familiares.familiares.isEmpty && familiares.estado != .listo) {
+                    await familiares.cargar()
+                }
+                try Task.checkCancellation()
+                await resolver(consulta, texto: texto, esSeguimiento: nueva == nil)
+            }
+            return
+        }
+
+        porResolver = nil
+        opciones = []
+        if relato?.pregunta != nil {
+            if BorradorDiarioFrida.quiereTerminar(texto) {
+                relato?.terminarPreguntas()
+                mensajes.append(Mensaje("Está bien. Puedes revisar lo que me contaste si quieres guardarlo."))
+            } else if !texto.contains("?") && !texto.contains("¿") {
+                seguirRelato(texto)
+            } else {
+                mensajes.append(Mensaje("Puedes responder la pregunta o tocar «Revisar nota» para guardar lo que ya contaste."))
+            }
+        } else if relato != nil {
+            mensajes.append(Mensaje("Puedes revisar o descartar el borrador antes de empezar otra nota."))
+        } else {
+            iniciarRelato(texto, esCotidiano: esRelato)
+        }
+    }
+
+    private var accionesDelRelato: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack { revisarNota; descartarNota }
+            VStack(alignment: .leading) { revisarNota; descartarNota }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var revisarNota: some View {
+        Button(action: prepararRevisionDeNota) {
+            Label("Revisar nota", systemImage: "note.text")
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var descartarNota: some View {
+        Button("Descartar borrador") {
+            relato = nil
+            mensajes.append(Mensaje("Está bien. Podemos hablar de otra cosa."))
+        }
+        .frame(minHeight: 44)
+        .buttonStyle(.bordered)
+    }
+
+    private func prepararRevisionDeNota() {
+        ejecutar {
+            if familiares.familiares.isEmpty { await familiares.cargar() }
+            try Task.checkCancellation()
+            mostrarNota = true
+        }
+    }
+
+    private var diariosDisponibles: [Familiar] {
+        familiares.familiares.filter { persona in
+            persona.puedeEscribirDiario && (persona.accesoVenceEn.map { $0 > .now } ?? true)
+        }
+    }
+
+    private var diarioInicial: UUID? {
+        if rolUsuario == UserRole.recibeCuidados.rawValue {
+            let propios = diariosDisponibles.filter { $0.rol == RolAcceso.titular.rawValue }
+            return propios.count == 1 ? propios.first?.id : nil
+        }
+        return diariosDisponibles.first { $0.id == familiarSeleccionado }?.id
+            ?? (diariosDisponibles.count == 1 ? diariosDisponibles.first?.id : nil)
+    }
+
+    private func iniciarRelato(_ texto: String, esCotidiano: Bool) {
+        guard texto.count <= SolicitudNota.largoMaximo else {
+            mensajes.append(Mensaje("Cuéntame una parte a la vez. Una nota del diario admite hasta \(SolicitudNota.largoMaximo) caracteres."))
             return
         }
         ejecutar {
-            if familiares.estado == .inicial || (familiares.familiares.isEmpty && familiares.estado != .listo) {
-                await familiares.cargar()
-            }
+            let sugerencia = try? await FridaDiario.sugerir(para: texto, yaPreguntados: [])
             try Task.checkCancellation()
-            await resolver(consulta, texto: texto, esSeguimiento: nueva == nil)
+            guard esCotidiano || sugerencia?.esRelato == true else {
+                mensajes.append(Mensaje("Puedes contarme algo de tu día, como «Hoy salí a caminar», o pedirme que abra una sección de la app."))
+                return
+            }
+
+            var borrador = BorradorDiarioFrida(texto: texto)
+            let orientacion = sugerencia ?? borrador.sugerenciaLocal()
+            borrador.aplicar(orientacion)
+            relato = borrador
+            mensajes.append(Mensaje("Gracias por contármelo. Si quieres, puedes guardarlo como nota del diario."))
+            anunciarPregunta()
         }
+    }
+
+    private func seguirRelato(_ texto: String) {
+        guard var borrador = relato, borrador.responder(texto) else {
+            mensajes.append(Mensaje("Tu respuesta es demasiado larga para la nota. Puedes acortarla o revisar lo que ya contaste."))
+            return
+        }
+        relato = borrador
+        guard borrador.conversacion.puedeContinuar else {
+            mensajes.append(Mensaje("Ya reuní lo que me contaste. ¿Quieres revisar la nota?"))
+            return
+        }
+
+        ejecutar {
+            let sugerencia = try? await FridaDiario.sugerir(
+                para: borrador.nota.texto, yaPreguntados: borrador.conversacion.detallesPreguntados
+            )
+            try Task.checkCancellation()
+            let orientacion = sugerencia ?? borrador.sugerenciaLocal()
+            borrador.aplicar(orientacion)
+            relato = borrador
+            if borrador.pregunta == nil {
+                mensajes.append(Mensaje("Ya reuní lo que me contaste. ¿Quieres revisar la nota?"))
+            } else {
+                anunciarPregunta()
+            }
+        }
+    }
+
+    private func anunciarPregunta() {
+        if let pregunta = relato?.pregunta { mensajes.append(Mensaje(pregunta.pregunta)) }
     }
 
     private func resolver(_ consulta: ConsultaFrida, texto: String, esSeguimiento: Bool) async {
@@ -364,6 +510,7 @@ struct FridaView: View {
         case .contactos: "Ver contactos de emergencia"
         case .pantalla(.agregarFamiliar): "Agregar persona"
         case .pantalla(.modulo(.medicamentos, _)): "Abrir Medicamentos"
+        case .pantalla(.modulo(.diario, _)): "Abrir diario"
         default: "Abrir Recordatorios"
         }
     }

@@ -104,7 +104,7 @@ struct DashboardView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Habla con Frida").font(.app(.headline))
-                    Text("Consulta medicamentos y recordatorios")
+                    Text("Cuenta cómo estuvo tu día o haz una consulta")
                         .font(.app(.subheadline))
                         .foregroundStyle(Color.textoSuave)
                 }

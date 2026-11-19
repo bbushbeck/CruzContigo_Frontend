@@ -29,12 +29,16 @@ muestra un botón que abre la pantalla de contactos.
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
 
+Frida también puede escuchar un relato cotidiano. Por ejemplo, escribe o dicta
+«Hoy salí a caminar» en el chat. Puede preguntarte cuánto duró o a dónde fuiste.
+En **Revisar nota**, puedes editar el texto, elegir el diario y revisar quién
+podrá leer la nota. **Guardar en diario** envía la nota a la API con tu sesión.
+
 ## Red de cuidado, contactos y diario
 
 - **Red de cuidado (HU-17, HU-26):** invita por teléfono o con un código de un solo uso (`cruzcontigo://invitacion/CODIGO`, registrado en `CruzContigo-Info.plist`) con rol administrador, cocuidador, solo lectura o temporal. El acceso temporal vence solo y no ve la ficha médica salvo que se permita.
 - **Contactos de emergencia (RF-15):** en orden de prioridad; salen en la ficha de emergencia sin conexión, en el QR y en el botón de Emergencia.
 - **Diario de cuidado (HU-13):** notas por tema con fecha y autor; solo el autor las edita.
-- **Frida en el diario.** Después de escribir una nota, toca **Pedir ayuda a Frida**. Apple Intelligence puede sugerir un tema y elegir una pregunta neutral sobre un detalle del borrador. Si agregas tu respuesta a la nota, Frida puede hacer una segunda pregunta. Puedes aplicar el tema sugerido y guardar cuando termines.
 
 Requiere que el backend tenga aplicado `red-de-cuidado.sql`.
 
