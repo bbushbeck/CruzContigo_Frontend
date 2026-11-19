@@ -22,10 +22,12 @@ Desde **Inicio**, abre **Habla con Frida**. Puedes escribir una consulta o dicta
 - «Llévame a Recordatorios»
 - «¿A quién puedo avisarle si le pasa algo a mi mamá?»
 
-Para los contactos de emergencia, Frida usa el modelo de similitud semántica
-en español de `NaturalLanguage` en el dispositivo. También puedes pedir
-«Ver contactos de emergencia» directamente. Frida resuelve el familiar y
-muestra un botón que abre la pantalla de contactos.
+Foundation Models interpreta las consultas sobre medicamentos, recordatorios y
+contactos, identifica el periodo cuando corresponde y orienta la conversación
+del diario. Los ejemplos en español están en `FridaDiario.swift`. La app valida
+la intención, busca a la persona en sus perfiles y aplica los permisos de la API.
+Las reglas de consulta y escucha sirven de respaldo si el modelo local no está
+disponible.
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
 
@@ -34,9 +36,9 @@ preguntas sencillas según el relato. Cuando termines o después de varias
 intervenciones ofrece preparar un resumen para el diario. También puedes
 pedírselo con «Guarda esto en mi diario».
 
-En **Revisar resumen** puedes editar el resumen generado por Apple Intelligence
-(o el relato original cuando el modelo no está disponible), elegir el diario
-y revisar quién podrá leerlo. **Guardar en diario** envía la nota a la API con
+En **Revisar resumen**, Apple Intelligence elige fragmentos del relato. Puedes
+compararlos con el texto original, editar la nota, elegir el diario y revisar
+quién podrá leerla. Si el modelo no está disponible, se conserva el relato. **Guardar en diario** envía la nota a la API con
 tu sesión.
 
 Si le dices a Frida que quieres seguir platicando, respeta ese ritmo. Las

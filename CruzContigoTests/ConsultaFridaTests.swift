@@ -34,22 +34,11 @@ struct ConsultaFridaTests {
         #expect(ConsultaFrida("No me muestres los contactos de emergencia") == nil)
     }
 
-    @Test func usaLaSugerenciaSemanticaSinCambiarLasOtrasRutas() {
+    @Test func conservaUnaFormaDePedirContactosSinModelo() {
         let pregunta = "¿A quién le aviso si le pasa algo a mi mamá?"
-        #expect(ConsultaFrida(pregunta, sugerirContactos: { $0 == pregunta })?.tema == .contactosEmergencia)
-        #expect(ConsultaFrida(pregunta) == nil)
-        #expect(ConsultaFrida("Mis recordatorios de hoy", sugerirContactos: { _ in true })?.tema == .recordatorios)
-        #expect(ConsultaFrida("No quiero llamar a nadie", sugerirContactos: { _ in true }) == nil)
-    }
-
-    @Test func aceptaSimilitudClaraYDescartaResultadosAmbiguos() {
-        let ejemploContacto = "a quién puedo llamar en caso de emergencia"
-        let ejemploDistinto = "necesito ayuda urgente ahora mismo"
-
-        #expect(ClasificadorContactosFrida.reconoce { $0 == ejemploContacto ? 0.2 : 0.7 })
-        #expect(!ClasificadorContactosFrida.reconoce { $0 == ejemploContacto ? 0.65 : 0.68 })
-        #expect(!ClasificadorContactosFrida.reconoce { $0 == ejemploDistinto ? 0.1 : 0.7 })
-        #expect(!ClasificadorContactosFrida.reconoce { _ in .infinity })
+        #expect(ConsultaFrida(pregunta)?.tema == .contactosEmergencia)
+        #expect(ConsultaFrida("Mis recordatorios de hoy")?.tema == .recordatorios)
+        #expect(ConsultaFrida("No quiero llamar a nadie") == nil)
     }
 
     @Test func seleccionaPorNombreCompletoOParentesco() {
