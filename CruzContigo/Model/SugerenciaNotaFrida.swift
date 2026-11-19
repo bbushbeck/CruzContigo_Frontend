@@ -34,7 +34,7 @@ struct SugerenciaNotaFrida: Equatable {
 
         var respuesta: String? {
             switch self {
-            case .dinero: "La preocupación por el dinero puede pesar mucho."
+            case .dinero: "Lamento que te estés sintiendo así."
             case .familia: "Te leo. Esto que cuentas sobre tu familia importa."
             case .responsabilidades: "Suena a que traes varias cosas encima."
             case .soledad: "Gracias por contarme cómo te has sentido."

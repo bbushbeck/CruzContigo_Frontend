@@ -9,7 +9,7 @@ enum ClasificadorContactosFrida {
         "a quién puedo llamar en caso de emergencia",
         "necesito el teléfono de una persona que pueda ayudar a mi familiar",
         "quiero comunicarme con alguien cercano al familiar si necesita ayuda",
-        "muéstrame los números guardados para una emergencia"
+        "muéstrame los números guardados para una emergencia",
     ]
 
     private static let otrasConsultas = [
@@ -21,7 +21,9 @@ enum ClasificadorContactosFrida {
         "necesito ayuda urgente ahora mismo",
         "quiero agendar una cita con el doctor",
         "qué medicamentos y recordatorios tengo hoy",
-        "quiero escribir una nota en el diario"
+        "quiero escribir una nota en el diario",
+        "mi familiar está en peligro",
+        "mi familiar necesita ayuda"
     ]
 
     #if canImport(NaturalLanguage)
