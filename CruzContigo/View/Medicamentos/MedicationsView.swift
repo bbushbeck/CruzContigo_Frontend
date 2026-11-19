@@ -78,7 +78,7 @@ struct MedicationsView: View {
                             Image(systemName: "chevron.down").foregroundStyle(MedicalStyle.red)
                         }
                         .padding(14)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        .background(Color.superficie, in: RoundedRectangle(cornerRadius: 16))
                     }
                     Picker("Tratamientos", selection: $status) {
                         Text("Actuales").tag(MedicationStatus.active)
@@ -150,7 +150,7 @@ private struct MedicationRow: View {
             Image(systemName: "chevron.right").icono(.flecha).foregroundStyle(Color.textoSuave)
         }
         .padding(14)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.superficie, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
