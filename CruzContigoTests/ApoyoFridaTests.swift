@@ -34,14 +34,14 @@ struct ApoyoFridaTests {
         let desahogo = "No he acabado tengo muchas cosas tengo que alimentar a mi familia"
         #expect(IntencionEscuchaFrida.pideEscucha(desahogo))
         #expect(!IntencionEscuchaFrida.soloPideEscucha(desahogo))
-        #expect(ConsultaFrida(desahogo, sugerirContactos: { _ in true }) == nil)
+        #expect(ConsultaFrida(desahogo) == nil)
 
         let rechazo = "Yo no quiero los contactos yo quiero que me escuches"
         #expect(IntencionEscuchaFrida.soloPideEscucha(rechazo))
-        #expect(ConsultaFrida(rechazo, sugerirContactos: { _ in true }) == nil)
+        #expect(ConsultaFrida(rechazo) == nil)
 
         let pregunta = "¿A quién puedo avisarle si le pasa algo a mi mamá?"
-        #expect(ConsultaFrida(pregunta, sugerirContactos: { _ in true })?.tema == .contactosEmergencia)
+        #expect(ConsultaFrida(pregunta)?.tema == .contactosEmergencia)
     }
 
     @Test func respondeAlTemaDelUltimoMensaje() {

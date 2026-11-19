@@ -1,15 +1,24 @@
 import Foundation
 
 struct ConsultaFrida: Equatable {
-    enum Tema { case medicamentos, recordatorios, contactosEmergencia }
-    enum Periodo { case todos, hoy, manana, proximos }
+    enum Tema: String { case medicamentos, recordatorios, contactosEmergencia }
+    enum Periodo: String { case todos, hoy, manana, proximos }
 
     let tema: Tema
     let periodo: Periodo
     let pendientes: Bool
     let abrirPantalla: Bool
+    let mencionaPersona: Bool
 
-    init?(_ texto: String, sugerirContactos: (String) -> Bool = { _ in false }) {
+    init(tema: Tema, periodo: Periodo, pendientes: Bool, abrirPantalla: Bool, mencionaPersona: Bool) {
+        self.tema = tema
+        self.periodo = periodo
+        self.pendientes = pendientes
+        self.abrirPantalla = abrirPantalla
+        self.mencionaPersona = mencionaPersona
+    }
+
+    init?(_ texto: String) {
         let palabras = Self.palabras(texto)
         let esContacto = IntencionEscuchaFrida.solicitaContacto(texto)
         let medicamentos: Set<String> = ["medicamentos", "medicamento", "medicinas", "medicina",
@@ -35,7 +44,7 @@ struct ConsultaFrida: Equatable {
         case (nil, nil) where Self.contiene("que tengo", en: palabras)
             && palabras.contains(where: { ["hoy", "manana"].contains($0) }):
             tema = .recordatorios
-        case (nil, nil) where esContacto && !Self.rechazaContactos(palabras) && sugerirContactos(texto):
+        case (nil, nil) where esContacto && !Self.rechazaContactos(palabras):
             tema = .contactosEmergencia
         default:
             return nil
@@ -47,8 +56,15 @@ struct ConsultaFrida: Equatable {
             periodo = .proximos
         } else { periodo = .todos }
 
+        mencionaPersona = false
         pendientes = palabras.contains(where: { ["pendiente", "pendientes"].contains($0) })
         abrirPantalla = palabras.contains(where: { ["abre", "abreme", "abrir", "llevame", "ir"].contains($0) })
+    }
+
+    // El modelo propone una ruta. La app verifica que el mensaje realmente la solicite.
+    static func autorizaContactos(_ texto: String) -> Bool {
+        let palabras = palabras(texto)
+        return IntencionEscuchaFrida.solicitaContacto(texto) && !rechazaContactos(palabras)
     }
 
     var requiereFamiliar: Bool { tema != .recordatorios }

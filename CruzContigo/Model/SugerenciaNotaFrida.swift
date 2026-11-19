@@ -223,9 +223,10 @@ struct BorradorDiarioFrida {
 
     static func esConsultaExplicita(_ texto: String) -> Bool {
         if texto.contains("?") || texto.contains("¿") { return true }
-        let palabras = ConsultaFrida.palabras(texto)
+        let palabras = ConsultaFrida.palabras(texto).drop(while: { ["frida", "oye"].contains($0) })
         guard let primera = palabras.first else { return false }
-        return ["abre", "abreme", "muestrame", "dime", "llevame", "que", "cuando", "cual", "cuales"].contains(primera)
+        return ["abre", "abreme", "muestrame", "dime", "llevame", "ver", "consulta", "consultar",
+                "puedes", "podrias", "que", "cuando", "cual", "cuales", "donde", "quien"].contains(primera)
             || palabras.starts(with: ["quiero", "ver"]) || palabras.starts(with: ["a", "quien"])
     }
 
