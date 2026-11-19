@@ -213,6 +213,11 @@ private struct EditarNotaView: View {
     @State private var intento = false
     @State private var guardando = false
     @State private var error: String?
+    @State private var notaParaFrida: String?
+    @State private var sugerenciaFrida: SugerenciaNotaFrida?
+    @State private var mensajeFrida: String?
+    @State private var respuestaFrida = ""
+    @State private var conversacionFrida = ConversacionNotaFrida()
 
     init(nota: NotaDiario?, nombre: String, guardar: @escaping (SolicitudNota) async throws -> Void) {
         self.nota = nota
@@ -252,7 +257,7 @@ private struct EditarNotaView: View {
                                 titulo: \.id
                             )
                         }
-                        TextEditor(text: $solicitud.texto)
+                        TextEditor(text: textoDeLaNota)
                             .font(.app(.body))
                             .frame(minHeight: 140)
                             .padding(8)
@@ -262,6 +267,8 @@ private struct EditarNotaView: View {
                             .font(.app(.caption))
                             .foregroundColor(solicitud.texto.count > SolicitudNota.largoMaximo ? .brandRed : .textoSuave)
                     }
+
+                    ayudaFrida
 
                     DatePicker("Cuándo", selection: $solicitud.fecha, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                         .font(.app(.body))
@@ -295,6 +302,10 @@ private struct EditarNotaView: View {
             }
         }
         .tint(.brandRed)
+        .task(id: notaParaFrida) { [notaParaFrida] in
+            guard let notaParaFrida else { return }
+            await consultarFrida(sobre: notaParaFrida)
+        }
         .interactiveDismissDisabled(guardando)
         .alert("No se pudo guardar", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("Aceptar", role: .cancel) {}
@@ -303,10 +314,132 @@ private struct EditarNotaView: View {
         }
     }
 
+    private var textoLimpio: String {
+        solicitud.texto.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var textoDeLaNota: Binding<String> {
+        Binding(get: { solicitud.texto }, set: { texto in
+            guard texto != solicitud.texto else { return }
+            solicitud.texto = texto
+            reiniciarFrida()
+        })
+    }
+
+    private var ayudaFrida: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(conversacionFrida.turnos) { turno in
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(turno.detalle.pregunta, systemImage: "sparkles")
+                        .font(.app(.subheadline).weight(.semibold))
+                    Text(turno.respuesta)
+                        .font(.app(.body))
+                        .padding(.leading, 22)
+                }
+            }
+
+            if conversacionFrida.puedeContinuar, notaParaFrida == nil, sugerenciaFrida?.detalle == nil {
+                Button(action: pedirFrida) {
+                    Label(conversacionFrida.turnos.isEmpty ? "Pedir ayuda a Frida" : "Continuar con Frida",
+                          systemImage: "sparkles")
+                        .font(.app(.subheadline).weight(.semibold))
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .disabled(textoLimpio.isEmpty || solicitud.texto.count > SolicitudNota.largoMaximo || guardando)
+            }
+
+            if notaParaFrida != nil {
+                ProgressView("Frida está leyendo tu nota…")
+            }
+            if let sugerenciaFrida {
+                if let sugerida = sugerenciaFrida.categoria {
+                    Text("Tema sugerido: \(sugerida.titulo)")
+                        .font(.app(.subheadline))
+                    if categoria != sugerida {
+                        Button("Usar tema \(sugerida.titulo)") { categoria = sugerida }
+                            .font(.app(.subheadline).weight(.semibold))
+                            .frame(minHeight: 44)
+                            .disabled(guardando)
+                    }
+                }
+                if let detalle = sugerenciaFrida.detalle {
+                    Label(detalle.pregunta, systemImage: "sparkles")
+                        .font(.app(.body).weight(.semibold))
+                    TextField("Tu respuesta", text: $respuestaFrida, axis: .vertical)
+                        .font(.app(.body))
+                        .lineLimit(1...3)
+                        .padding(8)
+                        .fieldBorder(false)
+                    Button("Agregar a la nota") { responderFrida(detalle) }
+                        .font(.app(.subheadline).weight(.semibold))
+                        .frame(minHeight: 44)
+                        .disabled(guardando || conversacionFrida.notaConRespuesta(respuestaFrida, en: textoLimpio) == nil)
+                }
+            }
+            if let mensajeFrida {
+                Text(mensajeFrida)
+                    .font(.app(.footnote))
+                    .foregroundStyle(Color.textoSuave)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.tintaSuave, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func pedirFrida() {
+        guard conversacionFrida.puedeContinuar else { return }
+        sugerenciaFrida = nil
+        mensajeFrida = nil
+        notaParaFrida = textoLimpio
+    }
+
+    private func responderFrida(_ detalle: SugerenciaNotaFrida.Detalle) {
+        guard let actualizada = conversacionFrida.agregar(respuestaFrida, a: detalle, en: textoLimpio) else { return }
+        solicitud.texto = actualizada
+        respuestaFrida = ""
+        sugerenciaFrida = nil
+        pedirFrida()
+    }
+
+    private func reiniciarFrida() {
+        notaParaFrida = nil
+        sugerenciaFrida = nil
+        mensajeFrida = nil
+        respuestaFrida = ""
+        conversacionFrida = ConversacionNotaFrida()
+    }
+
+    private func consultarFrida(sobre texto: String) async {
+        defer {
+            if !Task.isCancelled, notaParaFrida == texto { notaParaFrida = nil }
+        }
+        do {
+            let sugerencia = try await FridaDiario.sugerir(
+                para: texto, yaPreguntados: conversacionFrida.detallesPreguntados
+            )
+            guard !Task.isCancelled, notaParaFrida == texto, texto == textoLimpio else { return }
+            if let sugerencia {
+                if sugerencia.tieneContenido {
+                    sugerenciaFrida = sugerencia
+                } else {
+                    mensajeFrida = "Puedes seguir escribiendo o elegir el tema de tu nota."
+                }
+            } else {
+                mensajeFrida = "Apple Intelligence no está disponible en este dispositivo. Puedes seguir editando tu nota."
+            }
+        } catch {
+            guard !Task.isCancelled, notaParaFrida == texto, texto == textoLimpio else { return }
+            mensajeFrida = "Frida no pudo preparar una sugerencia. Puedes intentarlo de nuevo o continuar con tu nota."
+        }
+    }
+
     /// Una respuesta rápida se suma a lo ya escrito, sin borrarlo.
     private func agregar(_ texto: String) {
         let actual = solicitud.texto.trimmingCharacters(in: .whitespacesAndNewlines)
         solicitud.texto = actual.isEmpty ? texto : actual + ". " + texto
+        reiniciarFrida()
     }
 
     private func enviar() async {
