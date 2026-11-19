@@ -7,16 +7,15 @@ import SwiftUI
 
 struct DashboardView: View {
     @Binding var pestana: Pestana
+    @Binding var ruta: [Ruta]
+    let hablarConFrida: () -> Void
 
     @Environment(FamiliaresStore.self) private var store
     @Environment(Preferencias.self) private var preferencias
     @Environment(\.dynamicTypeSize) private var tipo
     @AppStorage(ClavesApp.personaSeleccionada) private var seleccionID = ""
     @AppStorage(ClavesApp.primerosPasosOcultos) private var primerosPasosOcultos = false
-    @State private var ruta: [Ruta] = []
     @State private var mostrarEmergencia = false
-    @State private var mostrarFrida = false
-    @State private var destinoFrida: Ruta?
     @Environment(\.openURL) private var abrirURL
 
     private var seleccionada: Familiar? {
@@ -73,12 +72,6 @@ struct DashboardView: View {
                 await SincronizadorFichaEmergencia().sincronizarTodas(store.familiares)
             }
         }
-        .sheet(isPresented: $mostrarFrida, onDismiss: navegarDesdeFrida) {
-            FridaView(familiarSeleccionado: seleccionada?.id) { destino in
-                destinoFrida = destino
-                mostrarFrida = false
-            }
-        }
         .sheet(isPresented: $mostrarEmergencia) {
             EmergenciaSheet(persona: seleccionada) { modulo in
                 mostrarEmergencia = false
@@ -92,9 +85,7 @@ struct DashboardView: View {
     }
 
     private var accesoFrida: some View {
-        Button {
-            mostrarFrida = true
-        } label: {
+        Button(action: hablarConFrida) {
             HStack(spacing: 12) {
                 Image("FridaAvatar")
                     .resizable()
@@ -104,7 +95,7 @@ struct DashboardView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Habla con Frida").font(.app(.headline))
-                    Text("Consulta medicamentos y recordatorios")
+                    Text("Cuenta cómo estuvo tu día o haz una consulta")
                         .font(.app(.subheadline))
                         .foregroundStyle(Color.textoSuave)
                 }
@@ -115,12 +106,6 @@ struct DashboardView: View {
             .tarjetaBorde()
         }
         .buttonStyle(.plain)
-    }
-
-    private func navegarDesdeFrida() {
-        guard let destinoFrida else { return }
-        ruta.append(destinoFrida)
-        self.destinoFrida = nil
     }
 
     private var encabezado: some View {

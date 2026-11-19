@@ -25,6 +25,33 @@ struct ConsultaFridaTests {
         #expect(ConsultaFrida.pideConsejoMedico("¿Qué medicamento le doy?"))
     }
 
+    @Test func reconoceContactosExplicitosSinModelo() {
+        let consulta = ConsultaFrida("Muéstrame los contactos de emergencia de mi mamá")
+        #expect(consulta?.tema == .contactosEmergencia)
+        #expect(consulta?.requiereFamiliar == true)
+        #expect(!ConsultaFrida.mencionaFamiliar("Ver contactos de emergencia"))
+        #expect(ConsultaFrida.mencionaFamiliar("Ver contactos de emergencia de Ana"))
+        #expect(ConsultaFrida("No me muestres los contactos de emergencia") == nil)
+    }
+
+    @Test func conservaUnaFormaDePedirContactosSinModelo() {
+        let pregunta = "¿A quién le aviso si le pasa algo a mi mamá?"
+        #expect(ConsultaFrida(pregunta)?.tema == .contactosEmergencia)
+        #expect(ConsultaFrida("Mis recordatorios de hoy")?.tema == .recordatorios)
+        #expect(ConsultaFrida("No quiero llamar a nadie") == nil)
+    }
+
+    @Test func resuelveLosContactosDeLaPersonaMencionada() {
+        let mafer = Familiar(nombre: "Mafer", apellidos: "López", fechaNacimiento: .now,
+                             parentesco: .hermana, tipoCuidado: .otro)
+        let ana = Familiar(nombre: "Ana", apellidos: "López", fechaNacimiento: .now,
+                           parentesco: .madre, tipoCuidado: .otro)
+        let frase = "Dame los contactos de emergencia de Mafer"
+        let consulta = ConsultaFrida.contactosSolicitados(frase)
+        #expect(consulta?.mencionaPersona == true)
+        #expect(ConsultaFrida.coincidencias(frase, familiares: [ana, mafer]) == [mafer])
+    }
+
     @Test func seleccionaPorNombreCompletoOParentesco() {
         let madre = Familiar(nombre: "María", apellidos: "López", fechaNacimiento: .now,
                              parentesco: .madre, tipoCuidado: .otro)

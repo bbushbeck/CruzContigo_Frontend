@@ -20,8 +20,50 @@ Desde **Inicio**, abre **Habla con Frida**. Puedes escribir una consulta o dicta
 - «¿Qué medicamentos toma mi mamá hoy?»
 - «¿Qué recordatorios tengo mañana?»
 - «Llévame a Recordatorios»
+- «¿A quién puedo avisarle si le pasa algo a mi mamá?»
+
+Foundation Models interpreta las consultas sobre medicamentos, recordatorios y
+contactos, identifica el periodo cuando corresponde y orienta la conversación
+del diario. Los ejemplos en español están en `FridaDiario.swift`. La app valida
+la intención, busca a la persona en sus perfiles y aplica los permisos de la API.
+Las reglas de consulta y escucha sirven de respaldo si el modelo local no está
+disponible.
 
 Frida consulta los datos registrados en la API y puede abrir la pantalla correspondiente. Los cambios se guardan desde las pantallas de Medicamentos y Recordatorios. El dictado requiere permisos de micrófono y reconocimiento de voz, además de disponibilidad de reconocimiento en español en el dispositivo.
+
+Puedes contarle a Frida algo de tu día por texto o voz. Foundation Models
+orienta la respuesta con el relato y los detalles que ya mencionaste.
+Prueba «¿Puedes guardarlo en notas?». Si Frida identifica un único diario y
+tienes permiso para escribir, guarda la nota por la API y te confirma en qué
+diario quedó. Si necesita confirmar el destino, te muestra el selector.
+
+En **Revisar resumen**, Apple Intelligence elige fragmentos del relato. Puedes
+compararlos con el texto original, editar la nota, elegir el diario y revisar
+quién podrá leerla. Si el modelo no está disponible, se conserva el relato. **Guardar en diario** envía la nota a la API con
+tu sesión.
+
+Si le dices a Frida que quieres seguir platicando, respeta ese ritmo. Las
+expresiones explícitas de peligro abren opciones de apoyo para México sin
+iniciar llamadas. Para riesgo de hacerse daño, la app muestra 911, Línea
+de la Vida y los contactos de emergencia disponibles en la cuenta.
+
+### Siri y Atajos
+
+Con Siri en español, di:
+
+- «Oye Siri, platicar con Frida en CruzContigo». Abre el chat.
+- «Oye Siri, pregúntale a Frida en CruzContigo». Siri pide la pregunta y Frida la responde en el chat.
+- «Oye Siri, pregúntale a Frida qué recordatorios tengo hoy en CruzContigo». Siri lee el resumen después de autenticarte en el dispositivo. La app necesita una sesión activa.
+
+Estas acciones también aparecen en **Atajos → CruzContigo**. Para invocarlas
+con un nombre propio, crea un atajo con la acción de CruzContigo y dile a Siri
+el nombre que le pusiste.
+
+Para probar la consulta de recordatorios cuando Siri ejecuta la app por su
+cuenta, agrega un ajuste de compilación definido por el usuario llamado
+`CRUZ_API_URL` en el target **CruzContigo → Build Settings** con la URL del
+backend accesible desde el iPhone. Si también está en las variables de
+entorno del esquema **Run**, usa la misma URL o desactiva esa variable.
 
 ## Red de cuidado, contactos y diario
 
